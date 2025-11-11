@@ -1,0 +1,56 @@
+# Source files
+src/
+tests/
+
+# Config files
+tsconfig.json
+vitest.config.ts
+.gitignore
+.npmignore
+
+# Development
+node_modules/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+coverage/
+.nyc_output/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker/
+docker-compose.yml
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# Git
+.git/
+.gitignore
+
+# Claude
+.claude/

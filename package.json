@@ -35,8 +35,21 @@
     "benthos",
     "redpanda-connect"
   ],
-  "author": "",
+  "author": "Marcelo Santos (@marcelsud)",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marcelsud/effect-connect.git"
+  },
+  "homepage": "https://github.com/marcelsud/effect-connect#readme",
+  "bugs": {
+    "url": "https://github.com/marcelsud/effect-connect/issues"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "@aws-sdk/client-sqs": "^3.705.0",
     "@effect/platform": "^0.68.0",
