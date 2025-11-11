@@ -1,0 +1,39 @@
+# Backpressure Control Example
+# This pipeline demonstrates how to control message throughput
+
+input:
+  redis_streams:
+    url: "redis://localhost:6379"
+    stream: "events-stream"
+    mode: "consumer-group"
+    consumer_group: "workers"
+    consumer_name: "worker-1"
+    count: 10
+    block_ms: 5000
+
+# Backpressure configuration
+pipeline:
+  backpressure:
+    max_concurrent_messages: 5          # Process max 5 messages concurrently
+    max_concurrent_outputs: 2           # Send max 2 outputs concurrently
+
+processors:
+  - uppercase:
+      fields: ["name", "category"]
+
+  - metadata:
+      correlation_id_field: "correlationId"
+
+output:
+  aws_sqs:
+    url: "http://localhost:4566/000000000000/output-queue"
+    region: "us-east-1"
+    endpoint: "http://localhost:4566"
+    max_batch_size: 10                  # Batch up to 10 messages
+    batch_timeout: 5000                 # Auto-flush after 5 seconds
+
+# Benefits:
+# - Prevents memory exhaustion
+# - Respects downstream rate limits
+# - Improves system stability
+# - Reduces latency with batch timeout

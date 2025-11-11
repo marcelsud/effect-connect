@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # LocalStack for AWS services (SQS)
+  localstack:
+    image: localstack/localstack:latest
+    container_name: camel-connect-localstack
+    ports:
+      - "4566:4566"            # LocalStack gateway
+    environment:
+      - SERVICES=sqs
+      - DEBUG=0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Redis Streams
+  redis:
+    image: redis:7-alpine
+    container_name: camel-connect-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Redis Commander (GUI for Redis)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: camel-connect-redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      - redis
+
+volumes:
+  redis-data:
+    driver: local

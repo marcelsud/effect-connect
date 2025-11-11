@@ -1,0 +1,26 @@
+input:
+  aws_sqs:
+    url: "http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/test-queue"
+    region: "us-east-1"
+    endpoint: "http://localhost:4566"
+    wait_time_seconds: 5
+    max_number_of_messages: 10
+
+pipeline:
+  processors:
+    - metadata:
+        correlation_id_field: "correlationId"
+        add_timestamp: true
+
+    - uppercase:
+        fields: ["name"]
+
+    - log:
+        level: "info"
+        include_content: true
+
+output:
+  redis_streams:
+    url: "redis://localhost:6379"
+    stream: "processed-messages"
+    max_length: 1000

@@ -1,0 +1,43 @@
+# Advanced Connection Configuration Example
+# This pipeline demonstrates connection pooling and timeout settings
+
+input:
+  aws_sqs:
+    url: "http://localhost:4566/000000000000/input-queue"
+    region: "us-east-1"
+    endpoint: "http://localhost:4566"
+    max_number_of_messages: 10
+    wait_time_seconds: 20
+
+    # Connection configuration for production
+    max_attempts: 5                     # Max retry attempts (default: 3)
+    request_timeout: 30000              # 30 second request timeout
+    connection_timeout: 5000            # 5 second connection timeout
+
+processors:
+  - metadata:
+      correlation_id_field: "correlationId"
+
+  - logging:
+      level: "info"
+
+output:
+  redis_streams:
+    url: "redis://localhost:6379"
+    stream: "processed-messages"
+    max_length: 10000
+    max_retries: 5
+
+    # Redis connection pooling configuration
+    connect_timeout: 10000              # Connection timeout in ms
+    command_timeout: 5000               # Command timeout in ms
+    keep_alive: 30000                   # TCP keep-alive in ms
+    lazy_connect: false                 # Connect immediately
+    max_retries_per_request: 20         # Max retries per request
+    enable_offline_queue: true          # Queue commands when offline
+
+# This configuration ensures:
+# - Robust connection handling
+# - Proper timeout management
+# - Automatic retry on transient failures
+# - Connection pooling for better performance

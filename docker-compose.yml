@@ -1,0 +1,102 @@
+services:
+  localstack:
+    image: localstack/localstack:latest
+    container_name: effect-connect-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=sqs
+      - DEBUG=1
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    volumes:
+      - "./docker/init-localstack.sh:/etc/localstack/init/ready.d/init-aws.sh"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: effect-connect-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Redis Commander (GUI for Redis)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: effect-connect-redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # Optional: Init service to create queues after LocalStack is ready
+  # This ensures all queues are created before your application starts
+  init-queues:
+    image: amazon/aws-cli:latest
+    container_name: effect-connect-init
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_DEFAULT_REGION=us-east-1
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        echo "Creating SQS queues..."
+
+        # Create test queue
+        aws --endpoint-url=http://localstack:4566 sqs create-queue \
+          --queue-name test-queue \
+          --attributes VisibilityTimeout=30
+
+        # Create input queue for examples
+        aws --endpoint-url=http://localstack:4566 sqs create-queue \
+          --queue-name input-queue \
+          --attributes VisibilityTimeout=30
+
+        # Create output queue for examples
+        aws --endpoint-url=http://localstack:4566 sqs create-queue \
+          --queue-name output-queue \
+          --attributes VisibilityTimeout=30
+
+        # Create DLQ queue
+        aws --endpoint-url=http://localstack:4566 sqs create-queue \
+          --queue-name dlq-queue \
+          --attributes VisibilityTimeout=30
+
+        echo "All queues created successfully!"
+
+        # Send test messages to test-queue
+        echo "Sending test messages to test-queue..."
+        QUEUE_URL=$$(aws --endpoint-url=http://localstack:4566 sqs get-queue-url --queue-name test-queue --query 'QueueUrl' --output text)
+
+        for i in 1 2 3 4 5; do
+          aws --endpoint-url=http://localstack:4566 sqs send-message \
+            --queue-url "$$QUEUE_URL" \
+            --message-body "{\"name\":\"test message $$i\",\"value\":$$i}"
+          echo "Sent message $$i"
+        done
+
+        echo "Setup complete!"
+
+volumes:
+  redis-data:
+    driver: local

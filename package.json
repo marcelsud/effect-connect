@@ -1,0 +1,61 @@
+{
+  "name": "effect-connect",
+  "version": "0.1.0",
+  "description": "Declarative streaming library powered by Effect.js, inspired by Apache Camel and Benthos",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "test": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:e2e": "vitest run tests/e2e",
+    "test:coverage": "vitest run --coverage",
+    "run-pipeline": "tsx src/cli.ts",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:ps": "docker-compose ps",
+    "lint": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\""
+  },
+  "keywords": [
+    "effect",
+    "streaming",
+    "integration",
+    "pipeline",
+    "camel",
+    "benthos",
+    "redpanda-connect"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.705.0",
+    "@effect/platform": "^0.68.0",
+    "@effect/schema": "^0.75.0",
+    "@smithy/node-http-handler": "^4.4.5",
+    "effect": "^3.10.0",
+    "ioredis": "^5.4.2",
+    "jsonata": "^2.1.0",
+    "yaml": "^2.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@vitest/coverage-v8": "^2.1.8",
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

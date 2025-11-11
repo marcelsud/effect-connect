@@ -1,0 +1,48 @@
+# Redis Streams to SQS Pipeline Example
+# Reads messages from Redis Streams and sends them to AWS SQS with transformations
+
+input:
+  redis_streams:
+    url: "redis://localhost:6379"
+    stream: "events-stream"
+    mode: "consumer-group"              # Use consumer group for reliable processing
+    consumer_group: "event-processors"
+    consumer_name: "processor-1"
+    block_ms: 5000                      # Block for 5 seconds waiting for messages
+    count: 10                           # Read up to 10 messages at a time
+    start_id: ">"                       # Process only new messages
+
+pipeline:
+  processors:
+    # Add metadata and correlation ID
+    - metadata:
+        correlation_id_field: "correlationId"
+        add_timestamp: true
+
+    # Transform event data using JSONata
+    - mapping:
+        expression: |
+          {
+            "eventType": type,
+            "eventData": {
+              "userId": $uppercase(userId),
+              "action": action,
+              "timestamp": $message.timestamp,
+              "metadata": $meta
+            },
+            "processed": true,
+            "processingTime": $now()
+          }
+
+    # Log processed events
+    - log:
+        level: "info"
+        include_content: true
+
+output:
+  aws_sqs:
+    url: "http://localhost:4566/000000000000/processed-events"
+    region: "us-east-1"
+    endpoint: "http://localhost:4566"  # LocalStack endpoint
+    max_batch_size: 10                  # Send in batches of 10
+    delay_seconds: 0                    # No delay

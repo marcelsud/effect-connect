@@ -1,0 +1,100 @@
+/**
+ * Core types and interfaces for the pipeline system
+ */
+import { Effect, Stream } from "effect"
+
+/**
+ * Message flowing through the pipeline
+ * Contains content, metadata, and tracing information
+ */
+export interface Message<A = unknown> {
+  readonly id: string
+  readonly content: A
+  readonly metadata: Record<string, unknown>
+  readonly timestamp: number
+  readonly correlationId?: string
+  readonly trace?: {
+    readonly spanId: string
+    readonly traceId: string
+  }
+}
+
+/**
+ * Input produces a Stream of messages
+ * Responsible for consuming from external sources (SQS, Kafka, HTTP, etc.)
+ */
+export interface Input<E = never, R = never> {
+  readonly name: string
+  readonly stream: Stream.Stream<Message, E, R>
+  readonly close?: () => Effect.Effect<void, never, never>
+}
+
+/**
+ * Processor transforms messages
+ * Can produce one or multiple messages from a single input
+ */
+export interface Processor<E = never, R = never> {
+  readonly name: string
+  readonly process: (
+    msg: Message
+  ) => Effect.Effect<Message | Message[], E, R>
+}
+
+/**
+ * Output consumes messages and sends them to external systems
+ * Responsible for writing to destinations (Redis, Postgres, HTTP, etc.)
+ */
+export interface Output<E = never, R = never> {
+  readonly name: string
+  readonly send: (msg: Message) => Effect.Effect<void, E, R>
+  readonly close?: () => Effect.Effect<void, never, never>
+}
+
+/**
+ * Backpressure configuration for pipeline execution
+ */
+export interface BackpressureConfig {
+  readonly maxConcurrentMessages?: number  // Max concurrent message processing (default: 10)
+  readonly maxConcurrentOutputs?: number   // Max concurrent output sends (default: 5)
+}
+
+/**
+ * Pipeline configuration combining input, processors, and output
+ */
+export interface Pipeline<E = never, R = never> {
+  readonly name: string
+  readonly input: Input<E, R>
+  readonly processors: ReadonlyArray<Processor<E, R>>
+  readonly output: Output<E, R>
+  readonly backpressure?: BackpressureConfig
+}
+
+/**
+ * Statistics from pipeline execution
+ */
+export interface PipelineStats {
+  readonly processed: number
+  readonly failed: number
+  readonly duration: number
+  readonly startTime: number
+  readonly endTime: number
+}
+
+/**
+ * Pipeline execution result
+ */
+export interface PipelineResult {
+  readonly success: boolean
+  readonly stats: PipelineStats
+  readonly errors?: ReadonlyArray<unknown>
+}
+
+/**
+ * Helper to create a message
+ */
+export const createMessage = <A>(content: A, metadata: Record<string, unknown> = {}): Message<A> => ({
+  id: crypto.randomUUID(),
+  content,
+  metadata,
+  timestamp: Date.now(),
+})
