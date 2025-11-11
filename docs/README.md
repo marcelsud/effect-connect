@@ -6,7 +6,7 @@ Complete documentation for all inputs, processors, outputs, and advanced feature
 
 Message sources for your pipelines:
 
-- **[AWS SQS](inputs/sqs.md)** - Read from SQS queues with LocalStack support
+- **[AWS SQS](inputs/sqs.md)** - Read from AWS SQS queues
 - **[Redis Streams](inputs/redis-streams.md)** - Read from Redis Streams (simple or consumer-group mode)
 
 ## ⚙️ Processors
@@ -35,6 +35,7 @@ Production-ready patterns and integrations:
 
 ## 🛠️ Development
 
+- **[Local Development Setup](local-development.md)** - Set up LocalStack and Docker Compose for local testing
 - **[Component Development Guide](COMPONENTS.md)** - Build custom inputs, processors, and outputs
 
 ## Quick Links
@@ -98,5 +99,6 @@ Found an issue or want to improve the docs? Please submit a PR!
 ## Need Help?
 
 - Check the [main README](../README.md) for getting started
+- Set up [local development](local-development.md) with LocalStack and Docker
 - Review [example configurations](../configs/)
 - See the [Component Development Guide](COMPONENTS.md) for building custom components

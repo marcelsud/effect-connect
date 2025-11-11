@@ -23,49 +23,44 @@ Build type-safe data pipelines with YAML configuration for message processing.
 npm install
 ```
 
-### 2. Start Infrastructure
+### 2. Configure Your Pipeline
 
-Start LocalStack (SQS) and Redis using Docker Compose:
+Create a pipeline configuration file (e.g., `my-pipeline.yaml`):
 
-```bash
-docker-compose up -d
+```yaml
+input:
+  aws_sqs:
+    url: "https://sqs.us-east-1.amazonaws.com/123456789012/input-queue"
+    region: "us-east-1"
+
+pipeline:
+  processors:
+    - metadata:
+        correlation_id_field: "correlationId"
+
+output:
+  aws_sqs:
+    url: "https://sqs.us-east-1.amazonaws.com/123456789012/output-queue"
+    region: "us-east-1"
 ```
 
-Services:
-- LocalStack (SQS) on port 4566
-- Redis on port 6379
-- Redis Commander (GUI) on port 8081
-- Auto-creates queues: `test-queue`, `input-queue`, `output-queue`, `dlq-queue`
-
-### 3. Run Example Pipeline
+### 3. Run Your Pipeline
 
 ```bash
-npm run run-pipeline configs/example-pipeline.yaml
+npm run run-pipeline my-pipeline.yaml
 ```
 
-This pipeline:
-1. Reads messages from SQS (LocalStack)
-2. Adds metadata and correlation IDs
-3. Transforms fields to uppercase
-4. Logs each message
-5. Sends to Redis Streams
+### Local Development
 
-### 4. Verify Results
-
-```bash
-docker exec -it effect-connect-redis redis-cli XREAD COUNT 10 STREAMS processed-messages 0
-```
-
-Or visit Redis Commander at http://localhost:8081
+For local development with LocalStack and Redis, see the [Local Development Guide](docs/local-development.md).
 
 ## Configuration Example
 
 ```yaml
 input:
   aws_sqs:
-    url: "http://localhost:4566/000000000000/input-queue"
+    url: "https://sqs.us-east-1.amazonaws.com/123456789012/input-queue"
     region: "us-east-1"
-    endpoint: "http://localhost:4566"
     # See docs/inputs/sqs.md for all options
 
 pipeline:
@@ -88,15 +83,17 @@ pipeline:
 
 output:
   redis_streams:
-    url: "redis://localhost:6379"
+    url: "rediss://production-redis.example.com:6379"
     stream: "processed-messages"
     max_length: 10000
+    tls: true
     # See docs/outputs/redis-streams.md
 
 # Optional: Dead Letter Queue for failures
 dlq:
   aws_sqs:
-    url: "http://localhost:4566/000000000000/dlq-queue"
+    url: "https://sqs.us-east-1.amazonaws.com/123456789012/dlq-queue"
+    region: "us-east-1"
     # See docs/advanced/dlq.md
 ```
 
@@ -104,7 +101,7 @@ dlq:
 
 ### 📥 Inputs
 
-- **[AWS SQS](docs/inputs/sqs.md)** - Read from SQS queues (LocalStack compatible)
+- **[AWS SQS](docs/inputs/sqs.md)** - Read from AWS SQS queues
 - **[Redis Streams](docs/inputs/redis-streams.md)** - Read from Redis Streams (simple or consumer-group mode)
 
 ### ⚙️ Processors
@@ -134,37 +131,6 @@ Explore ready-to-use configurations in `configs/`:
 - **[backpressure-example.yaml](configs/backpressure-example.yaml)** - Backpressure and batch timeout
 - **[advanced-connection.yaml](configs/advanced-connection.yaml)** - Production connection settings
 
-## Docker Commands
-
-Start all services:
-```bash
-# Using npm scripts
-npm run docker:up
-
-# Or directly
-docker-compose up -d
-```
-
-Stop all services:
-```bash
-npm run docker:down
-```
-
-View logs:
-```bash
-npm run docker:logs
-
-# Or specific service
-docker-compose logs -f localstack
-docker-compose logs -f redis
-docker-compose logs -f redis-commander
-```
-
-Check service health:
-```bash
-npm run docker:ps
-```
-
 ## Project Structure
 
 ```
@@ -182,10 +148,9 @@ effect-connect/
 │   ├── advanced/         # DLQ, Backpressure, Bloblang guides
 │   └── COMPONENTS.md     # Component development guide
 ├── configs/              # Example pipeline configurations
-├── tests/
-│   ├── unit/            # Unit tests (154 passing)
-│   └── e2e/             # End-to-end tests
-└── docker-compose.yml   # LocalStack, Redis, Redis Commander
+└── tests/
+    ├── unit/            # Unit tests (154 passing)
+    └── e2e/             # End-to-end tests
 ```
 
 ## Development
@@ -294,7 +259,7 @@ This provides:
 | **Configuration** | YAML | YAML | Java/XML/YAML |
 | **Streaming** | Effect.js Streams | Native | Camel Streams |
 | **Error Handling** | Effect monad | Go errors | Exceptions |
-| **LocalStack Support** | ✓ | ✓ | ✓ |
+| **Observability** | Built-in | ✓ | ✓ |
 | **Best For** | Node.js projects | Go projects | JVM projects |
 
 ## Future Enhancements
@@ -313,6 +278,7 @@ This provides:
 ## Documentation
 
 - **[Complete Component Catalog](docs/)** - Detailed documentation for all components
+- **[Local Development Setup](docs/local-development.md)** - LocalStack and Docker Compose guide
 - **[Component Development Guide](docs/COMPONENTS.md)** - Build custom components
 - **[Example Configurations](configs/)** - Ready-to-use pipeline examples
 
