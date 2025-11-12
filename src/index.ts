@@ -27,3 +27,6 @@ export * from "./processors/mapping-processor.js"
 export * from "./outputs/redis-streams-output.js"
 export * from "./outputs/sqs-output.js"
 export * from "./outputs/http-output.js"
+
+// Testing Utilities (for building tests and examples)
+export * from "./testing/index.js"
