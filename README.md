@@ -297,13 +297,60 @@ effect-connect/
 
 ## Development
 
+### Testing
+
+Effect Connect uses a scalable testing strategy that avoids N×N test explosion:
+
+```typescript
+import { Effect } from "effect"
+import {
+  createGenerateInput,
+  createCaptureOutput,
+  createPipeline,
+  runPipeline
+} from "effect-connect"
+
+// Generate test messages
+const input = createGenerateInput({
+  count: 5,
+  template: {
+    id: "msg-{{index}}",
+    value: "{{random}}"
+  }
+})
+
+// Capture output for assertions
+const output = await Effect.runPromise(createCaptureOutput())
+
+// Test your component
+const pipeline = createPipeline({
+  name: "test",
+  input,
+  processors: [yourProcessor],
+  output
+})
+
+await Effect.runPromise(runPipeline(pipeline))
+
+const messages = await Effect.runPromise(output.getMessages())
+expect(messages).toHaveLength(5)
+```
+
+**Key Benefits:**
+- ✅ Test components in isolation
+- ✅ No external dependencies needed
+- ✅ Linear test growth: N components = ~3N tests (not N²)
+- ✅ Fast execution: 228 tests in < 10 seconds
+
+**See [docs/TESTING.md](./docs/TESTING.md) for complete testing guide.**
+
 ### Run Tests
 
 ```bash
 # All tests
 npm test
 
-# Unit tests only
+# Unit tests only (228 tests)
 npm test:unit
 
 # E2E tests only
