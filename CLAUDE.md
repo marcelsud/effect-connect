@@ -4,7 +4,6 @@
 
 **Effect Connect** is a declarative streaming library for building type-safe data pipelines using YAML configuration. It's inspired by Apache Camel and Benthos, but built with TypeScript and Effect.js for full type safety and functional programming.
 
-- **Version**: 0.1.1
 - **Tech Stack**: TypeScript, Effect.js, @effect/schema, @effect/platform-node
 - **Distribution**: Published as npm package (`effect-connect`)
 - **Usage**: CLI tool + JavaScript/TypeScript library
@@ -12,9 +11,11 @@
 ### Key Features
 - YAML-based pipeline configuration
 - Type-safe with Effect.js monads and @effect/schema validation
+- HTTP input (webhook server) and output (API client) support
 - Streaming with backpressure control
 - Built-in Dead Letter Queue (DLQ) support
 - Automatic metrics and observability
+- Debug mode for troubleshooting (`--debug` flag)
 
 ## Architecture & Design
 
@@ -38,9 +39,9 @@ Effect.Stream   Effect      Effect      Effect
 ```
 src/
 ├── core/              # Pipeline orchestration, types, config loader, DLQ
-├── inputs/            # SQS, Redis Streams
+├── inputs/            # HTTP, SQS, Redis Streams
 ├── processors/        # Metadata, Uppercase, Mapping, Logging
-├── outputs/           # SQS, Redis Streams
+├── outputs/           # HTTP, SQS, Redis Streams
 ├── cli.ts            # CLI entry point (bin)
 └── index.ts          # Library exports
 ```
@@ -54,7 +55,7 @@ src/
 # Build TypeScript to dist/
 npm run build
 
-# Run all unit tests (149 tests)
+# Run all unit tests (166 tests)
 npm run test:unit
 
 # Run E2E tests
@@ -71,6 +72,7 @@ npm run format
 - **Binary**: `dist/cli.js` (has shebang: `#!/usr/bin/env node`)
 - **Test locally**: `npm link` creates global symlink
 - **Entry point**: Defined in `package.json` → `"bin": { "effect-connect": "./dist/cli.js" }`
+- **Debug mode**: Use `--debug` flag to see detailed logs (`effect-connect run config.yaml --debug`)
 
 ### Publishing
 ```bash
@@ -89,17 +91,17 @@ npm run docker:logs   # View logs
 
 ### Component Types
 
-1. **Inputs**: Read from sources (SQS, Redis Streams)
+1. **Inputs**: Read from sources (HTTP webhooks, SQS, Redis Streams)
    - Return: `Stream<Message, Error, Dependencies>`
-   - Example: `src/inputs/sqs-input.ts`
+   - Example: `src/inputs/http-input.ts`
 
 2. **Processors**: Transform messages (Metadata, Uppercase, Mapping, Logging)
    - Signature: `(message: Message) => Effect<Message, Error>`
    - Example: `src/processors/metadata-processor.ts`
 
-3. **Outputs**: Send to destinations (SQS, Redis Streams)
+3. **Outputs**: Send to destinations (HTTP APIs/webhooks, SQS, Redis Streams)
    - Signature: `(message: Message) => Effect<void, Error>`
-   - Example: `src/outputs/sqs-output.ts`
+   - Example: `src/outputs/http-output.ts`
 
 ### Creating New Components
 
