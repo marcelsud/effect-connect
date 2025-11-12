@@ -1,10 +1,13 @@
 {
   "name": "effect-connect",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Declarative streaming library powered by Effect.js, inspired by Apache Camel and Benthos",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "effect-connect": "./dist/cli.js"
+  },
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -24,7 +27,8 @@
     "docker:logs": "docker-compose logs -f",
     "docker:ps": "docker-compose ps",
     "lint": "tsc --noEmit",
-    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\""
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "prepublishOnly": "npm run build && npm run test:unit"
   },
   "keywords": [
     "effect",
@@ -52,10 +56,11 @@
   ],
   "dependencies": {
     "@aws-sdk/client-sqs": "^3.705.0",
-    "@effect/platform": "^0.68.0",
-    "@effect/schema": "^0.75.0",
+    "@effect/platform": "^0.93.0",
+    "@effect/platform-node": "^0.100.0",
+    "@effect/schema": "^0.75.5",
     "@smithy/node-http-handler": "^4.4.5",
-    "effect": "^3.10.0",
+    "effect": "^3.19.3",
     "ioredis": "^5.4.2",
     "jsonata": "^2.1.0",
     "yaml": "^2.6.1"

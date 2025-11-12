@@ -3,9 +3,44 @@
  * CLI entry point for running pipelines
  */
 import { Effect, Logger, LogLevel } from "effect"
+import { NodeRuntime } from "@effect/platform-node"
 import { loadConfig } from "./core/config-loader.js"
 import { buildPipeline } from "./core/pipeline-builder.js"
 import { run } from "./core/pipeline.js"
+import { readFileSync } from "node:fs"
+import { fileURLToPath } from "node:url"
+import { dirname, join } from "node:path"
+
+// Get package version
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+const packageJson = JSON.parse(readFileSync(join(__dirname, "../package.json"), "utf-8"))
+const appVersion = packageJson.version
+
+/**
+ * Show help message
+ */
+function showHelp() {
+  console.log(`
+effect-connect v${appVersion}
+
+Declarative streaming library powered by Effect.js, inspired by Apache Camel and Benthos
+
+Usage:
+  effect-connect run <config-file.yaml>
+
+Commands:
+  run <config-file>    Run a pipeline from a YAML configuration file
+
+Options:
+  -h, --help          Show this help message
+  -v, --version       Show version information
+
+Example:
+  effect-connect run configs/example-pipeline.yaml
+  npx effect-connect run my-pipeline.yaml
+`)
+}
 
 /**
  * Main CLI function
@@ -13,24 +48,34 @@ import { run } from "./core/pipeline.js"
 const main = Effect.gen(function* () {
   const args = process.argv.slice(2)
 
+  // Handle help flag
   if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
-    console.log(`
-Camel Connect JS - Apache Camel-inspired streaming library using Effect.js
-
-Usage:
-  npm run run-pipeline <config-file.yaml>
-
-Example:
-  npm run run-pipeline configs/example-pipeline.yaml
-
-Options:
-  -h, --help     Show this help message
-  -v, --version  Show version information
-    `)
+    showHelp()
     return
   }
 
-  const configPath = args[0]
+  // Handle version flag
+  if (args.includes("--version") || args.includes("-v")) {
+    console.log(`effect-connect v${appVersion}`)
+    return
+  }
+
+  // Check for run command
+  if (args[0] !== "run") {
+    console.error(`Error: Unknown command '${args[0]}'`)
+    console.error('Run "effect-connect --help" for usage information.')
+    yield* Effect.fail(new Error("Invalid command"))
+    return
+  }
+
+  // Get config file path
+  const configPath = args[1]
+  if (!configPath) {
+    console.error("Error: Missing config file argument")
+    console.error('Usage: effect-connect run <config-file.yaml>')
+    yield* Effect.fail(new Error("Missing config file"))
+    return
+  }
 
   yield* Effect.log(`Loading configuration from: ${configPath}`)
 
@@ -67,16 +112,67 @@ Options:
 }).pipe(
   Effect.catchAll((error) =>
     Effect.gen(function* () {
-      yield* Effect.logError(`Fatal error: ${error}`)
+      // Format error message properly
+      let errorMessage = "Unknown error"
+
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === "string") {
+        errorMessage = error
+      } else if (error && typeof error === "object") {
+        // Handle Effect errors with _tag
+        if ("_tag" in error && typeof error._tag === "string") {
+          const tag = error._tag
+
+          // Handle ConfigValidationError specially
+          if (tag === "ConfigValidationError" && "message" in error) {
+            const msg = String(error.message)
+            // Extract the useful part from the validation error
+            if (msg.includes("Schema validation failed:")) {
+              const parts = msg.split("Schema validation failed:")
+              errorMessage = `Configuration validation failed\n${parts[1]?.trim() || ""}`
+            } else {
+              errorMessage = `Configuration validation failed: ${msg}`
+            }
+          }
+          // Handle FileReadError
+          else if (tag === "FileReadError") {
+            if ("path" in error) {
+              errorMessage = `Cannot read file: ${error.path}`
+            } else {
+              errorMessage = "Cannot read configuration file"
+            }
+          }
+          // Handle YamlParseError
+          else if (tag === "YamlParseError") {
+            if ("message" in error) {
+              errorMessage = `Invalid YAML syntax: ${error.message}`
+            } else {
+              errorMessage = "Invalid YAML syntax"
+            }
+          }
+          // Generic tagged error
+          else {
+            errorMessage = tag
+            if ("message" in error) {
+              errorMessage += `: ${error.message}`
+            } else if ("error" in error) {
+              const err = error as { error: unknown }
+              errorMessage += `: ${JSON.stringify(err.error)}`
+            }
+          }
+        } else {
+          errorMessage = JSON.stringify(error, null, 2)
+        }
+      }
+
+      yield* Effect.logError(`Fatal error: ${errorMessage}`)
       process.exit(1)
     })
   )
 )
 
 // Run the CLI
-Effect.runPromise(
+NodeRuntime.runMain(
   main.pipe(Logger.withMinimumLogLevel(LogLevel.Info))
-).catch((error) => {
-  console.error("Unhandled error:", error)
-  process.exit(1)
-})
+)

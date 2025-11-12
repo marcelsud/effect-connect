@@ -1,5 +1,8 @@
 # Effect Connect
 
+[![npm version](https://img.shields.io/npm/v/effect-connect.svg)](https://www.npmjs.com/package/effect-connect)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Declarative streaming library powered by Effect.js, inspired by Apache Camel and Benthos.
 
 Build type-safe data pipelines with YAML configuration for message processing.
@@ -15,15 +18,31 @@ Build type-safe data pipelines with YAML configuration for message processing.
 - **Modular Architecture** - Pluggable inputs, processors, and outputs
 - **Production-Ready** - Connection pooling, batch processing, error categorization
 
-## Quick Start
+## Installation
 
-### 1. Install Dependencies
+### Option 1: Use with npx (No Installation Required)
 
 ```bash
-npm install
+npx effect-connect run my-pipeline.yaml
 ```
 
-### 2. Configure Your Pipeline
+### Option 2: Install Globally
+
+```bash
+npm install -g effect-connect
+effect-connect run my-pipeline.yaml
+```
+
+### Option 3: Install as Project Dependency
+
+```bash
+npm install effect-connect
+npx effect-connect run my-pipeline.yaml
+```
+
+## Quick Start
+
+### 1. Create Your Pipeline Configuration
 
 Create a pipeline configuration file (e.g., `my-pipeline.yaml`):
 
@@ -44,10 +63,57 @@ output:
     region: "us-east-1"
 ```
 
-### 3. Run Your Pipeline
+### 2. Run Your Pipeline
 
 ```bash
-npm run run-pipeline my-pipeline.yaml
+# Using npx (recommended)
+npx effect-connect run my-pipeline.yaml
+
+# Or if installed globally
+effect-connect run my-pipeline.yaml
+
+# Or using npm script in package.json
+npm run pipeline
+```
+
+### 3. CLI Commands
+
+```bash
+# Run a pipeline
+effect-connect run <config-file.yaml>
+
+# Show help
+effect-connect --help
+
+# Show version
+effect-connect --version
+```
+
+## Programmatic Usage
+
+You can also use Effect Connect as a library in your TypeScript/JavaScript projects:
+
+```typescript
+import { loadConfig } from "effect-connect"
+import { buildPipeline } from "effect-connect"
+import { run } from "effect-connect"
+import { Effect } from "effect"
+
+const program = Effect.gen(function* () {
+  // Load configuration
+  const config = yield* loadConfig("my-pipeline.yaml")
+
+  // Build pipeline
+  const pipeline = yield* buildPipeline(config)
+
+  // Run pipeline
+  const result = yield* run(pipeline)
+
+  return result
+})
+
+// Execute
+Effect.runPromise(program)
 ```
 
 ### Local Development
