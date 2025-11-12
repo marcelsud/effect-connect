@@ -2,7 +2,7 @@
  * SQS Output - Sends messages to AWS SQS (works with LocalStack)
  */
 import { Effect, Ref, Schedule, Fiber, Duration } from "effect"
-import { Schema } from "@effect/schema"
+import * as Schema from "effect/Schema"
 import {
   SQSClient,
   SendMessageCommand,

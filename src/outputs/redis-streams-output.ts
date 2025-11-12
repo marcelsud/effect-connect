@@ -2,7 +2,7 @@
  * Redis Streams Output - Sends messages to Redis Streams
  */
 import { Effect, Schedule } from "effect"
-import { Schema } from "@effect/schema"
+import * as Schema from "effect/Schema"
 import Redis from "ioredis"
 import type { Output, Message } from "../core/types.js"
 import { ComponentError, type ErrorCategory, detectCategory } from "../core/errors.js"

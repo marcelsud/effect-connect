@@ -2,7 +2,7 @@
  * HTTP Output - Sends messages via HTTP/HTTPS requests
  */
 import { Effect, Schedule } from "effect"
-import { Schema } from "@effect/schema"
+import * as Schema from "effect/Schema"
 import { HttpClient, HttpClientRequest } from "@effect/platform"
 import { NodeHttpClient } from "@effect/platform-node"
 import type { Output, Message } from "../core/types.js"

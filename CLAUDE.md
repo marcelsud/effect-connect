@@ -109,7 +109,7 @@ All components follow the same pattern:
 
 ```typescript
 import { Effect } from "effect"
-import { Schema } from "@effect/schema"
+import { Schema } from "effect/Schema"
 
 // 1. Define config schema
 const MyComponentConfig = Schema.Struct({
@@ -150,10 +150,10 @@ const program = Effect.gen(function* () {
 ```
 
 ### Schema Validation
-Configurations are validated using `@effect/schema`:
+Configurations are validated using Effect Schema:
 
 ```typescript
-import { Schema } from "@effect/schema"
+import { Schema } from "effect/Schema"
 
 const Config = Schema.Struct({
   url: Schema.String,

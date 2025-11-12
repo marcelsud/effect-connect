@@ -2,7 +2,7 @@
  * HTTP Input - Webhook server that receives HTTP POST requests
  */
 import { Effect, Stream, Queue } from "effect"
-import { Schema } from "@effect/schema"
+import * as Schema from "effect/Schema"
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http"
 import type { Input, Message } from "../core/types.js"
 import { createMessage } from "../core/types.js"

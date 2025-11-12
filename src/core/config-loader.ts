@@ -2,7 +2,7 @@
  * Configuration loader and validator using Effect Schema
  */
 import { Effect, pipe } from "effect"
-import { Schema as S } from "@effect/schema"
+import * as S from "effect/Schema"
 import * as yaml from "yaml"
 import * as fs from "node:fs/promises"
 

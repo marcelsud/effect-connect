@@ -1,6 +1,6 @@
 {
   "name": "effect-connect",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Declarative streaming library powered by Effect.js, inspired by Apache Camel and Benthos",
   "type": "module",
   "main": "./dist/index.js",
@@ -58,7 +58,6 @@
     "@aws-sdk/client-sqs": "^3.705.0",
     "@effect/platform": "^0.93.0",
     "@effect/platform-node": "^0.100.0",
-    "@effect/schema": "^0.75.5",
     "@smithy/node-http-handler": "^4.4.5",
     "effect": "^3.19.3",
     "ioredis": "^5.4.2",

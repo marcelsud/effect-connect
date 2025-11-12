@@ -2,7 +2,7 @@
  * SQS Input - Consumes messages from AWS SQS (works with LocalStack)
  */
 import { Effect, Stream, Schedule } from "effect"
-import { Schema } from "@effect/schema"
+import * as Schema from "effect/Schema"
 import {
   SQSClient,
   ReceiveMessageCommand,

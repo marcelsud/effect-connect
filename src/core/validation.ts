@@ -1,7 +1,7 @@
 /**
  * Configuration validation using Effect Schema
  */
-import { Schema } from "@effect/schema"
+import * as Schema from "effect/Schema"
 import { Effect } from "effect"
 import { ComponentError, type ErrorCategory } from "./errors.js"
 

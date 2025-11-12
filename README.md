@@ -364,10 +364,10 @@ Effect Connect is built on [Effect.js](https://effect.website/), a powerful libr
 
 ### Configuration Validation
 
-Configurations are validated using `@effect/schema`:
+Configurations are validated using Effect Schema:
 
 ```typescript
-import { Schema } from "@effect/schema"
+import { Schema } from "effect/Schema"
 
 const SqsInputConfig = Schema.Struct({
   url: Schema.String,

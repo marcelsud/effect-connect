@@ -2,7 +2,7 @@
  * Redis Streams Input - Consumes messages from Redis Streams
  */
 import { Effect, Stream, Ref } from "effect"
-import { Schema } from "@effect/schema"
+import * as Schema from "effect/Schema"
 import Redis from "ioredis"
 import type { Input, Message } from "../core/types.js"
 import { createMessage } from "../core/types.js"
