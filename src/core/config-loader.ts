@@ -50,13 +50,23 @@ const RedisStreamsInputSchema = S.Struct({
 })
 
 /**
+ * Schema for HTTP Input configuration (Bento style)
+ */
+const HttpInputSchema = S.Struct({
+  port: S.Number,
+  host: S.optional(S.String),
+  path: S.optional(S.String),
+  timeout: S.optional(S.Number),
+})
+
+/**
  * Input configuration - detects type by key
  */
 const InputConfigSchema = S.Struct({
   aws_sqs: S.optional(AwsSqsInputSchema),
   redis_streams: S.optional(RedisStreamsInputSchema),
+  http: S.optional(HttpInputSchema),
   // Future inputs can be added here:
-  // http: S.optional(HttpInputSchema),
   // kafka: S.optional(KafkaInputSchema),
 })
 
@@ -123,14 +133,33 @@ const AwsSqsOutputSchema = S.Struct({
 })
 
 /**
+ * Schema for HTTP Output configuration (Bento style)
+ */
+const HttpOutputSchema = S.Struct({
+  url: S.String,
+  method: S.optional(S.Union(S.Literal("POST"), S.Literal("PUT"), S.Literal("PATCH"))),
+  headers: S.optional(S.Record({ key: S.String, value: S.String })),
+  timeout: S.optional(S.Number),
+  max_retries: S.optional(S.Number),
+  auth: S.optional(
+    S.Struct({
+      type: S.Union(S.Literal("basic"), S.Literal("bearer")),
+      username: S.optional(S.String),
+      password: S.optional(S.String),
+      token: S.optional(S.String),
+    })
+  ),
+})
+
+/**
  * Output configuration - detects type by key
  */
 const OutputConfigSchema = S.Struct({
   redis_streams: S.optional(RedisStreamsOutputSchema),
   aws_sqs: S.optional(AwsSqsOutputSchema),
+  http: S.optional(HttpOutputSchema),
   // Future outputs can be added here:
   // postgres: S.optional(PostgresOutputSchema),
-  // http: S.optional(HttpOutputSchema),
 })
 
 /**

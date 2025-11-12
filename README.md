@@ -46,6 +46,30 @@ npx effect-connect run my-pipeline.yaml
 
 Create a pipeline configuration file (e.g., `my-pipeline.yaml`):
 
+**Example 1: HTTP Webhook Forwarder**
+```yaml
+input:
+  http:
+    port: 8080
+    path: "/webhook"
+
+pipeline:
+  processors:
+    - metadata:
+        correlation_id_field: "correlationId"
+        add_timestamp: true
+    - log:
+        level: info
+
+output:
+  http:
+    url: "https://api.example.com/events"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+```
+
+**Example 2: SQS to SQS Pipeline**
 ```yaml
 input:
   aws_sqs:
@@ -76,17 +100,66 @@ effect-connect run my-pipeline.yaml
 npm run pipeline
 ```
 
-### 3. CLI Commands
+### 3. Test Your HTTP Pipeline
+
+For HTTP input pipelines, send test requests:
+
+```bash
+# Start the pipeline
+effect-connect run my-pipeline.yaml
+
+# In another terminal, send a test request
+curl -X POST http://localhost:8080/webhook \
+  -H "Content-Type: application/json" \
+  -d '{"event": "user_signup", "user_id": 12345}'
+```
+
+### 4. CLI Commands
 
 ```bash
 # Run a pipeline
 effect-connect run <config-file.yaml>
+
+# Run with debug logging
+effect-connect run <config-file.yaml> --debug
 
 # Show help
 effect-connect --help
 
 # Show version
 effect-connect --version
+```
+
+### 5. Debug Mode
+
+Enable detailed debug logging to troubleshoot pipeline configuration and execution:
+
+```bash
+# Enable debug mode
+effect-connect run my-pipeline.yaml --debug
+```
+
+Debug mode provides:
+- **Configuration Details**: View the parsed YAML configuration
+- **Pipeline Building**: See how inputs, processors, and outputs are constructed
+- **Component Initialization**: Track when components start and connect
+- **Processing Flow**: Monitor message flow through the pipeline
+
+Example debug output:
+```
+DEBUG MODE ENABLED
+[23:06:11.565] DEBUG (#1): Loaded config: {
+  "input": {
+    "http": {
+      "port": 8080,
+      "host": "0.0.0.0",
+      "path": "/webhook"
+    }
+  },
+  ...
+}
+[23:06:11.565] DEBUG (#1): buildPipeline received config: {...}
+[23:06:11.565] DEBUG (#1): buildInput received config: {...}
 ```
 
 ## Programmatic Usage
@@ -167,6 +240,7 @@ dlq:
 
 ### 📥 Inputs
 
+- **[HTTP](docs/inputs/http.md)** - Receive webhook POST requests
 - **[AWS SQS](docs/inputs/sqs.md)** - Read from AWS SQS queues
 - **[Redis Streams](docs/inputs/redis-streams.md)** - Read from Redis Streams (simple or consumer-group mode)
 
@@ -179,6 +253,7 @@ dlq:
 
 ### 📤 Outputs
 
+- **[HTTP](docs/outputs/http.md)** - Send to HTTP/HTTPS endpoints (webhooks, APIs)
 - **[AWS SQS](docs/outputs/sqs.md)** - Send to SQS queues (single or batch mode)
 - **[Redis Streams](docs/outputs/redis-streams.md)** - Send to Redis Streams with length management
 
@@ -192,6 +267,7 @@ dlq:
 
 Explore ready-to-use configurations in `configs/`:
 
+- **[http-webhook-example.yaml](configs/http-webhook-example.yaml)** - HTTP webhook server forwarding to HTTP endpoint
 - **[example-pipeline.yaml](configs/example-pipeline.yaml)** - Basic pipeline (SQS → Processors → Redis)
 - **[dlq-example.yaml](configs/dlq-example.yaml)** - Dead Letter Queue configuration
 - **[backpressure-example.yaml](configs/backpressure-example.yaml)** - Backpressure and batch timeout
@@ -310,11 +386,13 @@ This provides:
 
 ## Use Cases
 
+- **Webhook Forwarding** - Receive webhooks and forward to multiple destinations with transformation
 - **Event-Driven Architectures** - Process events between microservices
 - **Data Pipelines** - ETL and data transformation workflows
 - **Message Queue Processing** - Reliable message consumption and production
 - **Stream Processing** - Real-time data processing with backpressure
 - **Integration Patterns** - Connect different systems and protocols
+- **API Gateway Patterns** - Route and transform HTTP requests to backend services
 
 ## Why Effect Connect?
 
@@ -330,9 +408,10 @@ This provides:
 
 ## Future Enhancements
 
-- [ ] More inputs (Kafka, HTTP, File, Kinesis)
+- [x] HTTP input and output
+- [ ] More inputs (Kafka, File, Kinesis, WebSocket)
 - [ ] More processors (Filter, Transform, Enrich, Split/Join)
-- [ ] More outputs (Postgres, HTTP, S3, Elasticsearch)
+- [ ] More outputs (Postgres, S3, Elasticsearch, gRPC)
 - [ ] Circuit breaker pattern
 - [ ] Web UI for pipeline management
 - [ ] OpenTelemetry exporter integration

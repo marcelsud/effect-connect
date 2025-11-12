@@ -27,7 +27,7 @@ effect-connect v${appVersion}
 Declarative streaming library powered by Effect.js, inspired by Apache Camel and Benthos
 
 Usage:
-  effect-connect run <config-file.yaml>
+  effect-connect run <config-file.yaml> [options]
 
 Commands:
   run <config-file>    Run a pipeline from a YAML configuration file
@@ -35,9 +35,11 @@ Commands:
 Options:
   -h, --help          Show this help message
   -v, --version       Show version information
+  --debug             Enable debug logging
 
 Example:
   effect-connect run configs/example-pipeline.yaml
+  effect-connect run my-pipeline.yaml --debug
   npx effect-connect run my-pipeline.yaml
 `)
 }
@@ -60,6 +62,9 @@ const main = Effect.gen(function* () {
     return
   }
 
+  // Check for debug flag
+  const debugMode = args.includes("--debug")
+
   // Check for run command
   if (args[0] !== "run") {
     console.error(`Error: Unknown command '${args[0]}'`)
@@ -68,8 +73,8 @@ const main = Effect.gen(function* () {
     return
   }
 
-  // Get config file path
-  const configPath = args[1]
+  // Get config file path (filter out flags)
+  const configPath = args.find(arg => !arg.startsWith("--") && arg !== "run")
   if (!configPath) {
     console.error("Error: Missing config file argument")
     console.error('Usage: effect-connect run <config-file.yaml>')
@@ -84,8 +89,12 @@ const main = Effect.gen(function* () {
 
   yield* Effect.log(`Configuration loaded successfully`)
 
+  if (debugMode) {
+    yield* Effect.logDebug(`Loaded config: ${JSON.stringify(config, null, 2)}`)
+  }
+
   // Build pipeline from config
-  const pipeline = yield* buildPipeline(config)
+  const pipeline = yield* buildPipeline(config, debugMode)
 
   yield* Effect.log(`Pipeline built successfully with ${pipeline.processors.length} processors`)
 
@@ -173,6 +182,9 @@ const main = Effect.gen(function* () {
 )
 
 // Run the CLI
+const debugMode = process.argv.includes("--debug")
 NodeRuntime.runMain(
-  main.pipe(Logger.withMinimumLogLevel(LogLevel.Info))
+  main.pipe(
+    Logger.withMinimumLogLevel(debugMode ? LogLevel.Debug : LogLevel.Info)
+  )
 )

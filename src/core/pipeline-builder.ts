@@ -6,12 +6,14 @@ import type { PipelineConfig, InputConfig, ProcessorConfig, OutputConfig } from 
 import type { Pipeline, Input, Processor, Output } from "./types.js"
 import { createSqsInput } from "../inputs/sqs-input.js"
 import { createRedisStreamsInput } from "../inputs/redis-streams-input.js"
+import { createHttpInput } from "../inputs/http-input.js"
 import { createMetadataProcessor } from "../processors/metadata-processor.js"
 import { createUppercaseProcessor } from "../processors/uppercase-processor.js"
 import { createLoggingProcessor } from "../processors/logging-processor.js"
 import { createMappingProcessor } from "../processors/mapping-processor.js"
 import { createRedisStreamsOutput } from "../outputs/redis-streams-output.js"
 import { createSqsOutput } from "../outputs/sqs-output.js"
+import { createHttpOutput } from "../outputs/http-output.js"
 
 export class BuildError {
   readonly _tag = "BuildError"
@@ -21,7 +23,17 @@ export class BuildError {
 /**
  * Build input from configuration (Bento style)
  */
-const buildInput = (config: InputConfig): Effect.Effect<Input<any>, BuildError> => {
+const buildInput = (config: InputConfig, debug = false): Effect.Effect<Input<any>, BuildError> => {
+  if (debug) {
+    return Effect.gen(function* () {
+      yield* Effect.logDebug(`buildInput received config: ${JSON.stringify(config, null, 2)}`)
+      return yield* buildInputInternal(config)
+    })
+  }
+  return buildInputInternal(config)
+}
+
+const buildInputInternal = (config: InputConfig): Effect.Effect<Input<any>, BuildError> => {
   if (config.aws_sqs) {
     return Effect.succeed(
       createSqsInput({
@@ -69,6 +81,17 @@ const buildInput = (config: InputConfig): Effect.Effect<Input<any>, BuildError> 
         blockMs: config.redis_streams.block_ms,
         count: config.redis_streams.count,
         startId: config.redis_streams.start_id,
+      })
+    )
+  }
+
+  if (config.http) {
+    return Effect.succeed(
+      createHttpInput({
+        port: config.http.port,
+        host: config.http.host,
+        path: config.http.path,
+        timeout: config.http.timeout,
       })
     )
   }
@@ -170,15 +193,32 @@ const buildOutput = (config: OutputConfig): Effect.Effect<Output<any>, BuildErro
     )
   }
 
+  if (config.http) {
+    return Effect.succeed(
+      createHttpOutput({
+        url: config.http.url,
+        method: config.http.method,
+        headers: config.http.headers,
+        timeout: config.http.timeout,
+        maxRetries: config.http.max_retries,
+        auth: config.http.auth,
+      })
+    )
+  }
+
   return Effect.fail(new BuildError("No valid output configuration found"))
 }
 
 /**
  * Build complete pipeline from configuration (Bento style)
  */
-export const buildPipeline = (config: PipelineConfig): Effect.Effect<Pipeline<any>, BuildError> => {
+export const buildPipeline = (config: PipelineConfig, debug = false): Effect.Effect<Pipeline<any>, BuildError> => {
   return Effect.gen(function* () {
-    const input = yield* buildInput(config.input)
+    if (debug) {
+      yield* Effect.logDebug(`buildPipeline received config: ${JSON.stringify(config, null, 2)}`)
+    }
+
+    const input = yield* buildInput(config.input, debug)
 
     const processorConfigs = config.pipeline?.processors || []
     const processors = yield* Effect.forEach(
@@ -192,9 +232,11 @@ export const buildPipeline = (config: PipelineConfig): Effect.Effect<Pipeline<an
     // Generate name from input and output types
     const inputType = config.input.aws_sqs ? "aws_sqs" :
                      config.input.redis_streams ? "redis_streams" :
+                     config.input.http ? "http" :
                      "unknown"
     const outputType = config.output.redis_streams ? "redis_streams" :
                       config.output.aws_sqs ? "aws_sqs" :
+                      config.output.http ? "http" :
                       "unknown"
 
     return {

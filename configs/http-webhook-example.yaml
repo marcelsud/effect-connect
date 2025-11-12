@@ -1,0 +1,39 @@
+# HTTP Webhook Example
+# Receives webhook requests on port 8080 and forwards them to webhook.site
+#
+# Usage:
+#   effect-connect run configs/http-webhook-example.yaml
+#
+# Test with:
+#   curl -X POST http://localhost:8080/webhook \
+#     -H "Content-Type: application/json" \
+#     -d '{"message": "Hello from effect-connect!"}'
+#
+# View results at: https://webhook.site/#!/74ed15d1-ebfe-4c99-be1b-751e821e084a
+
+input:
+  http:
+    port: 8080
+    host: "0.0.0.0"
+    path: "/webhook"
+    timeout: 30000
+
+pipeline:
+  processors:
+    - metadata:
+        correlation_id_field: "correlationId"
+        add_timestamp: true
+
+    - log:
+        level: info
+        include_content: true
+
+output:
+  http:
+    url: "https://webhook.site/74ed15d1-ebfe-4c99-be1b-751e821e084a"
+    method: POST
+    timeout: 5000
+    max_retries: 3
+    headers:
+      Content-Type: "application/json"
+      X-Source: "effect-connect"
