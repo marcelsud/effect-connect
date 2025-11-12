@@ -55,7 +55,7 @@ src/
 # Build TypeScript to dist/
 npm run build
 
-# Run all unit tests (166 tests)
+# Run all unit tests (228 tests)
 npm run test:unit
 
 # Run E2E tests
@@ -67,6 +67,16 @@ npm run lint
 # Format code
 npm run format
 ```
+
+### Testing Strategy
+Effect Connect uses a scalable testing approach that avoids N×N test explosion:
+
+- **Testing Utilities**: `createGenerateInput`, `createCaptureOutput`, `createAssertProcessor`
+- **Pattern**: Test components in isolation (Input → Assert → Capture)
+- **Scale**: N components = ~3N tests (not N²)
+- **Speed**: All 228 tests run in < 10 seconds
+
+**See [docs/TESTING.md](./docs/TESTING.md) for complete testing guide.**
 
 ### CLI Development
 - **Binary**: `dist/cli.js` (has shebang: `#!/usr/bin/env node`)
@@ -209,6 +219,7 @@ The CLI (`src/cli.ts`) handles Effect errors by formatting them for user-friendl
 
 ## Links
 
+- **Testing Strategy**: `docs/TESTING.md` ⭐ Start here for testing!
 - **Component Development**: `docs/COMPONENTS.md`
 - **Input Docs**: `docs/inputs/`
 - **Processor Docs**: `docs/processors/`
