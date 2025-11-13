@@ -252,10 +252,12 @@ export const buildPipeline = (config: PipelineConfig, debug = false): Effect.Eff
     const inputType = config.input.aws_sqs ? "aws_sqs" :
                      config.input.redis_streams ? "redis_streams" :
                      config.input.http ? "http" :
+                     (config.input as any).generate ? "generate" :
                      "unknown"
     const outputType = config.output.redis_streams ? "redis_streams" :
                       config.output.aws_sqs ? "aws_sqs" :
                       config.output.http ? "http" :
+                      (config.output as any).capture ? "capture" :
                       "unknown"
 
     return {
