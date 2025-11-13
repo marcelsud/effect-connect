@@ -842,6 +842,81 @@ YAML tests allow you to:
 - Run tests from the CLI with `effect-connect test`
 - Get formatted test output with pass/fail status
 
+### Testing Philosophy
+
+**No External Dependencies**
+
+YAML tests are designed to run **without any external infrastructure**:
+- ❌ No real databases (PostgreSQL, MySQL, MongoDB)
+- ❌ No real message queues (SQS, Redis, Kafka)
+- ❌ No real HTTP servers or APIs
+- ✅ 100% in-memory, deterministic tests
+
+**The Generate → Process → Capture Pattern**
+
+Instead of testing against real infrastructure, YAML tests use:
+
+```yaml
+pipeline:
+  input:
+    generate:          # ← Generate test data in-memory
+      count: 5
+      template: {...}
+
+  processors:          # ← Test your business logic
+    - uppercase: {...}
+    - metadata: {...}
+
+  output:
+    capture: {}        # ← Capture results in-memory
+```
+
+This approach provides:
+- **Speed**: No network I/O, all in-memory
+- **Reliability**: No flaky external dependencies
+- **Isolation**: Each test is independent
+- **Simplicity**: No Docker containers or test infrastructure needed
+
+**What YAML Tests Should Cover**
+
+✅ **DO test:**
+- Processor logic and transformations
+- Pipeline composition (multiple processors)
+- Error handling and failure scenarios
+- Configuration validation
+- Message routing and filtering
+- Data mapping and enrichment
+
+❌ **DON'T test:**
+- Database connection pooling
+- Network retry logic
+- SQS batch optimization
+- Redis cluster failover
+- HTTP authentication flows
+
+These infrastructure concerns are covered by **unit tests** for each component.
+
+**The Separation of Concerns**
+
+```
+YAML Tests (Pipeline Logic)
+├─ Processor behavior
+├─ Data transformations
+├─ Error handling
+└─ Configuration validation
+
+Unit Tests (Component Integration)
+├─ Database connectivity
+├─ Message queue operations
+├─ HTTP client behavior
+└─ Resource management
+```
+
+This separation ensures:
+- YAML tests are **fast** (< 100ms for 17 tests)
+- Unit tests validate **infrastructure integration**
+- No test duplication between layers
+
 ### Running YAML Tests
 
 ```bash
@@ -912,6 +987,86 @@ The YAML test runner supports 10 assertion types:
 - `pipeline_success`: Pipeline completed successfully
 - `pipeline_failed`: Pipeline failed (for error tests)
 
+### Practical Example: Testing a Multi-Processor Pipeline
+
+Here's a real-world example testing a pipeline that:
+1. Generates user data
+2. Transforms it with JSONata
+3. Adds metadata
+4. Validates the complete flow
+
+```yaml
+name: User Processing Pipeline Tests
+
+tests:
+  - name: "Should enrich user data and add tracking metadata"
+    pipeline:
+      input:
+        generate:
+          count: 3
+          template:
+            firstName: "User"
+            lastName: "{{index}}"
+            age: "{{index}}"
+
+      processors:
+        # Transform with JSONata
+        - mapping:
+            expression: |
+              {
+                "fullName": firstName & " " & lastName,
+                "age": $number(age) + 18,
+                "category": $number(age) + 18 >= 21 ? "adult" : "minor"
+              }
+
+        # Add correlation ID and timestamp
+        - metadata:
+            correlation_id_field: userId
+            add_timestamp: true
+
+      output:
+        capture: {}
+
+    assertions:
+      # Verify message count
+      - type: message_count
+        expected: 3
+
+      # Check transformed data
+      - type: field_value
+        message: 0
+        path: content.fullName
+        expected: "User 0"
+
+      - type: field_value
+        message: 0
+        path: content.age
+        expected: 18
+
+      # Verify metadata was added
+      - type: all_match
+        condition: $exists(metadata.userId)
+
+      - type: all_match
+        condition: $exists(metadata.processedAt)
+
+      # Check categorization logic
+      - type: field_value
+        message: 0
+        path: content.category
+        expected: "minor"
+
+      - type: some_match
+        condition: content.category = "adult"
+```
+
+**Why this works:**
+- ✅ No database needed to test transformation logic
+- ✅ No API calls needed to test enrichment
+- ✅ Fast execution (< 10ms)
+- ✅ Deterministic results
+- ✅ Tests business logic, not infrastructure
+
 ### Testing Error Scenarios
 
 Use `expectError` to test failure cases:
@@ -934,6 +1089,159 @@ Use `expectError` to test failure cases:
 
   expectError:
     messageContains: "Condition evaluated to false"
+```
+
+### Best Practices and Anti-Patterns
+
+#### ✅ DO: Test Business Logic
+
+```yaml
+# GOOD: Testing processor transformation logic
+- name: "Should normalize user data"
+  pipeline:
+    input:
+      generate:
+        count: 1
+        template:
+          email: "USER@EXAMPLE.COM"
+          name: "john doe"
+
+    processors:
+      - mapping:
+          expression: |
+            {
+              "email": $lowercase(email),
+              "name": $uppercase(name)
+            }
+
+    output:
+      capture: {}
+
+  assertions:
+    - type: field_value
+      message: 0
+      path: content.email
+      expected: "user@example.com"
+```
+
+#### ❌ DON'T: Test Infrastructure Connectivity
+
+```yaml
+# BAD: Don't test database connections in YAML tests
+- name: "Should connect to PostgreSQL"  # ❌ Wrong layer
+  pipeline:
+    input:
+      postgres:              # ❌ Real database
+        connection: "..."
+    processors: []
+    output:
+      capture: {}
+```
+
+**Why?** Infrastructure testing belongs in **unit tests** where you can:
+- Mock dependencies
+- Test connection pooling
+- Test retry logic
+- Test error scenarios properly
+
+#### ✅ DO: Use Template Placeholders
+
+```yaml
+# GOOD: Dynamic test data
+input:
+  generate:
+    count: 10
+    template:
+      id: "user-{{index}}"           # 0, 1, 2, ...
+      uuid: "{{uuid}}"                # Unique UUID each
+      random: "{{random}}"            # Random number
+      timestamp: "{{timestamp}}"      # ISO timestamp
+```
+
+#### ❌ DON'T: Hardcode Everything
+
+```yaml
+# BAD: Repetitive, hard to maintain
+input:
+  generate:
+    count: 3
+    template:
+      id: "user-0"    # ❌ Same for all messages
+```
+
+#### ✅ DO: Test Edge Cases
+
+```yaml
+# GOOD: Test missing fields, empty values, edge cases
+tests:
+  - name: "Should handle missing optional fields"
+    pipeline:
+      input:
+        generate:
+          count: 1
+          template:
+            required: "value"
+            # optional field intentionally omitted
+
+      processors:
+        - uppercase:
+            fields:
+              - required
+              - optional  # Won't fail if missing
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: field_value
+        message: 0
+        path: content.required
+        expected: "VALUE"
+```
+
+#### ✅ DO: Group Related Tests
+
+```yaml
+name: Metadata Processor Tests
+
+tests:
+  - name: "Should add correlation ID"
+    # ...
+
+  - name: "Should add timestamp when configured"
+    # ...
+
+  - name: "Should add both correlation ID and timestamp"
+    # ...
+```
+
+#### ❌ DON'T: Put Unrelated Tests Together
+
+```yaml
+name: Random Tests  # ❌ Too vague
+
+tests:
+  - name: "Test uppercase"           # ❌ Different concerns
+  - name: "Test database connection" # ❌ in same file
+  - name: "Test HTTP timeout"        # ❌
+```
+
+#### ✅ DO: Write Clear Test Names
+
+```yaml
+# GOOD: Descriptive, explains what is being tested
+- name: "Should uppercase all specified fields"
+- name: "Should handle missing fields gracefully"
+- name: "Should fail when required field is missing"
+```
+
+#### ❌ DON'T: Use Vague Names
+
+```yaml
+# BAD: Unclear what is being tested
+- name: "Test 1"           # ❌ What does this test?
+- name: "Check stuff"      # ❌ Too vague
+- name: "It works"         # ❌ Works how?
 ```
 
 ### Example Tests
