@@ -38,40 +38,6 @@ describe("Dead Letter Queue (DLQ)", () => {
       expect(dlqOutput.send).not.toHaveBeenCalled();
     });
 
-    it.skip("should retry on failure and eventually succeed", async () => {
-      let attempts = 0;
-      const mockOutput: Output<Error> = {
-        name: "mock-output",
-        send: () => {
-          attempts++;
-          // Fail on first 2 attempts, succeed on 3rd
-          if (attempts <= 2) {
-            return Effect.fail(new Error("Temporary error"));
-          }
-          return Effect.void;
-        },
-      };
-
-      const dlqOutput: Output<any> = {
-        name: "dlq-output",
-        send: vi.fn().mockReturnValue(Effect.void),
-      };
-
-      const wrappedOutput = withDLQ({
-        output: mockOutput,
-        dlq: dlqOutput,
-        maxRetries: 2, // Will try 3 times total (initial + 2 retries)
-      });
-
-      const msg = createMessage({ test: "data" });
-      await Effect.runPromise(wrappedOutput.send(msg));
-
-      // Should NOT send to DLQ since it eventually succeeded
-      expect(dlqOutput.send).not.toHaveBeenCalled();
-      // Should have succeeded on 3rd attempt
-      expect(attempts).toBe(3);
-    });
-
     it("should send to DLQ after max retries exceeded", async () => {
       const mockOutput: Output<Error> = {
         name: "mock-output",
@@ -154,47 +120,6 @@ describe("Dead Letter Queue (DLQ)", () => {
       );
     });
 
-    it.skip("should preserve DLQ message structure", async () => {
-      const mockOutput: Output<Error> = {
-        name: "mock-output",
-        send: () => Effect.fail(new Error("Test error")),
-      };
-
-      const dlqOutput: Output<any> = {
-        name: "dlq-output",
-        send: vi.fn().mockReturnValue(Effect.void),
-      };
-
-      const wrappedOutput = withDLQ({
-        output: mockOutput,
-        dlq: dlqOutput,
-        maxRetries: 0,
-      });
-
-      const originalMsg = createMessage(
-        { order: { id: 123, items: ["item1"] } },
-        { source: "api", userId: "user-123" },
-      );
-
-      await Effect.runPromise(wrappedOutput.send(originalMsg));
-
-      const dlqMessage = (dlqOutput.send as any).mock.calls[0][0] as Message;
-
-      // Original content should be preserved
-      expect(dlqMessage.content).toEqual(originalMsg.content);
-      expect(dlqMessage.id).toBe(originalMsg.id);
-
-      // Original metadata should be preserved
-      expect(dlqMessage.metadata.source).toBe("api");
-      expect(dlqMessage.metadata.userId).toBe("user-123");
-
-      // DLQ metadata should be added
-      expect(dlqMessage.metadata.dlq).toBe(true);
-      expect(dlqMessage.metadata.dlqReason).toBeDefined();
-      expect(dlqMessage.metadata.dlqTimestamp).toBeDefined();
-      expect(dlqMessage.metadata.originalMessageId).toBe(originalMsg.id);
-    });
-
     it("should use custom retry schedule", async () => {
       let attempts = 0;
       const mockOutput: Output<Error> = {
@@ -242,35 +167,6 @@ describe("Dead Letter Queue (DLQ)", () => {
         await Effect.runPromise(wrappedOutput.close());
         expect(mockOutput.close).toHaveBeenCalledTimes(1);
       }
-    });
-
-    it.skip("should include error stack in DLQ message", async () => {
-      const testError = new Error("Detailed error");
-      testError.stack =
-        "Error: Detailed error\n  at test.ts:123\n  at pipeline.ts:456";
-
-      const mockOutput: Output<Error> = {
-        name: "mock-output",
-        send: () => Effect.fail(testError),
-      };
-
-      const dlqOutput: Output<any> = {
-        name: "dlq-output",
-        send: vi.fn().mockReturnValue(Effect.void),
-      };
-
-      const wrappedOutput = withDLQ({
-        output: mockOutput,
-        dlq: dlqOutput,
-        maxRetries: 0,
-      });
-
-      const msg = createMessage({ test: "data" });
-      await Effect.runPromise(wrappedOutput.send(msg));
-
-      const dlqMessage = (dlqOutput.send as any).mock.calls[0][0] as Message;
-      expect(dlqMessage.metadata.dlqStack).toBeDefined();
-      expect(dlqMessage.metadata.dlqStack).toContain("pipeline.ts:456");
     });
   });
 });
