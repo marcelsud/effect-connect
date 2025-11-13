@@ -1,6 +1,6 @@
 {
   "name": "effect-connect",
-  "version": "0.4.0",
+  "version": "0.4.2",
   "description": "Declarative streaming library powered by Effect.js, inspired by Apache Camel and Benthos",
   "type": "module",
   "main": "./dist/index.js",

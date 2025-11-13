@@ -252,6 +252,7 @@ dlq:
 - **[Metadata](docs/processors/metadata.md)** - Add correlation IDs and timestamps
 - **[Uppercase](docs/processors/uppercase.md)** - Transform fields to uppercase
 - **[Mapping](docs/processors/mapping.md)** - JSONata transformations (complex data manipulation)
+- **[HTTP](docs/processors/http.md)** - Call external APIs for enrichment and validation
 - **[Logging](docs/processors/logging.md)** - Log message flow for debugging
 
 ### 📤 Outputs

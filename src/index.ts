@@ -24,6 +24,7 @@ export * from "./processors/metadata-processor.js";
 export * from "./processors/uppercase-processor.js";
 export * from "./processors/logging-processor.js";
 export * from "./processors/mapping-processor.js";
+export * from "./processors/http-processor.js";
 
 // Outputs
 export * from "./outputs/redis-streams-output.js";
