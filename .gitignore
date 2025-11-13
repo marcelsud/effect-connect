@@ -43,4 +43,4 @@ temp/
 tmp-e2e-tests/
 
 # E2E test results (keep infrastructure and scripts)
-tests/e2e/results/*.log
+tests/e2e/results/*
