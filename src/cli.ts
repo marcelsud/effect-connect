@@ -2,21 +2,23 @@
 /**
  * CLI entry point for running pipelines
  */
-import { Effect, Logger, LogLevel } from "effect"
-import { NodeRuntime } from "@effect/platform-node"
-import { loadConfig } from "./core/config-loader.js"
-import { buildPipeline } from "./core/pipeline-builder.js"
-import { run } from "./core/pipeline.js"
-import { runYamlTests, formatTestResults } from "./testing/yaml-test-runner.js"
-import { readFileSync } from "node:fs"
-import { fileURLToPath } from "node:url"
-import { dirname, join } from "node:path"
+import { Effect, Logger, LogLevel } from "effect";
+import { NodeRuntime } from "@effect/platform-node";
+import { loadConfig } from "./core/config-loader.js";
+import { buildPipeline } from "./core/pipeline-builder.js";
+import { run } from "./core/pipeline.js";
+import { runYamlTests, formatTestResults } from "./testing/yaml-test-runner.js";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 
 // Get package version
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-const packageJson = JSON.parse(readFileSync(join(__dirname, "../package.json"), "utf-8"))
-const appVersion = packageJson.version
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(
+  readFileSync(join(__dirname, "../package.json"), "utf-8"),
+);
+const appVersion = packageJson.version;
 
 /**
  * Show help message
@@ -44,178 +46,180 @@ Examples:
   effect-connect run my-pipeline.yaml --debug
   effect-connect test "tests/**/*.yaml"
   effect-connect test tests/processors/uppercase.test.yaml
-`)
+`);
 }
 
 /**
  * Main CLI function
  */
 const main = Effect.gen(function* () {
-  const args = process.argv.slice(2)
+  const args = process.argv.slice(2);
 
   // Handle help flag
   if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
-    showHelp()
-    return
+    showHelp();
+    return;
   }
 
   // Handle version flag
   if (args.includes("--version") || args.includes("-v")) {
-    console.log(`effect-connect v${appVersion}`)
-    return
+    console.log(`effect-connect v${appVersion}`);
+    return;
   }
 
   // Check for debug flag
-  const debugMode = args.includes("--debug")
+  const debugMode = args.includes("--debug");
 
   // Handle test command
   if (args[0] === "test") {
-    const pattern = args.find(arg => !arg.startsWith("--") && arg !== "test")
+    const pattern = args.find((arg) => !arg.startsWith("--") && arg !== "test");
     if (!pattern) {
-      console.error("Error: Missing test pattern argument")
-      console.error('Usage: effect-connect test <pattern>')
-      console.error('Example: effect-connect test "tests/**/*.yaml"')
-      yield* Effect.fail(new Error("Missing test pattern"))
-      return
+      console.error("Error: Missing test pattern argument");
+      console.error("Usage: effect-connect test <pattern>");
+      console.error('Example: effect-connect test "tests/**/*.yaml"');
+      yield* Effect.fail(new Error("Missing test pattern"));
+      return;
     }
 
-    yield* Effect.log(`Running tests matching pattern: ${pattern}`)
+    yield* Effect.log(`Running tests matching pattern: ${pattern}`);
 
     // Run YAML tests
-    const result = yield* runYamlTests(pattern)
+    const result = yield* runYamlTests(pattern);
 
     // Display formatted results
-    console.log(formatTestResults(result))
+    console.log(formatTestResults(result));
 
     // Exit with appropriate code
     if (result.failedTests > 0) {
-      yield* Effect.fail(new Error("Some tests failed"))
+      yield* Effect.fail(new Error("Some tests failed"));
     } else {
-      yield* Effect.log("All tests passed!")
+      yield* Effect.log("All tests passed!");
     }
-    return
+    return;
   }
 
   // Check for run command
   if (args[0] !== "run") {
-    console.error(`Error: Unknown command '${args[0]}'`)
-    console.error('Run "effect-connect --help" for usage information.')
-    yield* Effect.fail(new Error("Invalid command"))
-    return
+    console.error(`Error: Unknown command '${args[0]}'`);
+    console.error('Run "effect-connect --help" for usage information.');
+    yield* Effect.fail(new Error("Invalid command"));
+    return;
   }
 
   // Get config file path (filter out flags)
-  const configPath = args.find(arg => !arg.startsWith("--") && arg !== "run")
+  const configPath = args.find((arg) => !arg.startsWith("--") && arg !== "run");
   if (!configPath) {
-    console.error("Error: Missing config file argument")
-    console.error('Usage: effect-connect run <config-file.yaml>')
-    yield* Effect.fail(new Error("Missing config file"))
-    return
+    console.error("Error: Missing config file argument");
+    console.error("Usage: effect-connect run <config-file.yaml>");
+    yield* Effect.fail(new Error("Missing config file"));
+    return;
   }
 
-  yield* Effect.log(`Loading configuration from: ${configPath}`)
+  yield* Effect.log(`Loading configuration from: ${configPath}`);
 
   // Load and validate config
-  const config = yield* loadConfig(configPath)
+  const config = yield* loadConfig(configPath);
 
-  yield* Effect.log(`Configuration loaded successfully`)
+  yield* Effect.log(`Configuration loaded successfully`);
 
   if (debugMode) {
-    yield* Effect.logDebug(`Loaded config: ${JSON.stringify(config, null, 2)}`)
+    yield* Effect.logDebug(`Loaded config: ${JSON.stringify(config, null, 2)}`);
   }
 
   // Build pipeline from config
-  const pipeline = yield* buildPipeline(config, debugMode)
+  const pipeline = yield* buildPipeline(config, debugMode);
 
-  yield* Effect.log(`Pipeline built successfully with ${pipeline.processors.length} processors`)
+  yield* Effect.log(
+    `Pipeline built successfully with ${pipeline.processors.length} processors`,
+  );
 
   // Run the pipeline
-  yield* Effect.log("Starting pipeline execution...")
-  const result = yield* run(pipeline)
+  yield* Effect.log("Starting pipeline execution...");
+  const result = yield* run(pipeline);
 
   // Display results
   if (result.success) {
-    yield* Effect.log("✓ Pipeline completed successfully!")
-    yield* Effect.log(`  Processed: ${result.stats.processed} messages`)
-    yield* Effect.log(`  Failed: ${result.stats.failed} messages`)
-    yield* Effect.log(`  Duration: ${result.stats.duration}ms`)
+    yield* Effect.log("✓ Pipeline completed successfully!");
+    yield* Effect.log(`  Processed: ${result.stats.processed} messages`);
+    yield* Effect.log(`  Failed: ${result.stats.failed} messages`);
+    yield* Effect.log(`  Duration: ${result.stats.duration}ms`);
   } else {
-    yield* Effect.logError("✗ Pipeline failed!")
+    yield* Effect.logError("✗ Pipeline failed!");
     if (result.errors) {
-      yield* Effect.logError(`  Errors: ${result.errors.length}`)
+      yield* Effect.logError(`  Errors: ${result.errors.length}`);
       for (const error of result.errors) {
-        yield* Effect.logError(`    - ${error}`)
+        yield* Effect.logError(`    - ${error}`);
       }
     }
-    yield* Effect.fail(new Error("Pipeline execution failed"))
+    yield* Effect.fail(new Error("Pipeline execution failed"));
   }
 }).pipe(
   Effect.catchAll((error) =>
     Effect.gen(function* () {
       // Format error message properly
-      let errorMessage = "Unknown error"
+      let errorMessage = "Unknown error";
 
       if (error instanceof Error) {
-        errorMessage = error.message
+        errorMessage = error.message;
       } else if (typeof error === "string") {
-        errorMessage = error
+        errorMessage = error;
       } else if (error && typeof error === "object") {
         // Handle Effect errors with _tag
         if ("_tag" in error && typeof error._tag === "string") {
-          const tag = error._tag
+          const tag = error._tag;
 
           // Handle ConfigValidationError specially
           if (tag === "ConfigValidationError" && "message" in error) {
-            const msg = String(error.message)
+            const msg = String(error.message);
             // Extract the useful part from the validation error
             if (msg.includes("Schema validation failed:")) {
-              const parts = msg.split("Schema validation failed:")
-              errorMessage = `Configuration validation failed\n${parts[1]?.trim() || ""}`
+              const parts = msg.split("Schema validation failed:");
+              errorMessage = `Configuration validation failed\n${parts[1]?.trim() || ""}`;
             } else {
-              errorMessage = `Configuration validation failed: ${msg}`
+              errorMessage = `Configuration validation failed: ${msg}`;
             }
           }
           // Handle FileReadError
           else if (tag === "FileReadError") {
             if ("path" in error) {
-              errorMessage = `Cannot read file: ${error.path}`
+              errorMessage = `Cannot read file: ${error.path}`;
             } else {
-              errorMessage = "Cannot read configuration file"
+              errorMessage = "Cannot read configuration file";
             }
           }
           // Handle YamlParseError
           else if (tag === "YamlParseError") {
             if ("message" in error) {
-              errorMessage = `Invalid YAML syntax: ${error.message}`
+              errorMessage = `Invalid YAML syntax: ${error.message}`;
             } else {
-              errorMessage = "Invalid YAML syntax"
+              errorMessage = "Invalid YAML syntax";
             }
           }
           // Generic tagged error
           else {
-            errorMessage = tag
+            errorMessage = tag;
             if ("message" in error) {
-              errorMessage += `: ${error.message}`
+              errorMessage += `: ${error.message}`;
             } else if ("error" in error) {
-              const err = error as { error: unknown }
-              errorMessage += `: ${JSON.stringify(err.error)}`
+              const err = error as { error: unknown };
+              errorMessage += `: ${JSON.stringify(err.error)}`;
             }
           }
         } else {
-          errorMessage = JSON.stringify(error, null, 2)
+          errorMessage = JSON.stringify(error, null, 2);
         }
       }
 
-      yield* Effect.logError(`Fatal error: ${errorMessage}`)
-      process.exit(1)
-    })
-  )
-)
+      yield* Effect.logError(`Fatal error: ${errorMessage}`);
+      process.exit(1);
+    }),
+  ),
+);
 
 // Run the CLI
-const debugMode = process.argv.includes("--debug")
+const debugMode = process.argv.includes("--debug");
 NodeRuntime.runMain(
   main.pipe(
-    Logger.withMinimumLogLevel(debugMode ? LogLevel.Debug : LogLevel.Info)
-  ) as Effect.Effect<void>
-)
+    Logger.withMinimumLogLevel(debugMode ? LogLevel.Debug : LogLevel.Info),
+  ) as Effect.Effect<void>,
+);

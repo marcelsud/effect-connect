@@ -244,6 +244,8 @@ dlq:
 - **[HTTP](docs/inputs/http.md)** - Receive webhook POST requests
 - **[AWS SQS](docs/inputs/sqs.md)** - Read from AWS SQS queues
 - **[Redis Streams](docs/inputs/redis-streams.md)** - Read from Redis Streams (simple or consumer-group mode)
+- **[Redis Pub/Sub](docs/inputs/redis-pubsub.md)** - Subscribe to Redis Pub/Sub channels/patterns
+- **[Redis Lists](docs/inputs/redis-list.md)** - Pop from Redis Lists (BLPOP/BRPOP queues)
 
 ### ⚙️ Processors
 
@@ -257,6 +259,8 @@ dlq:
 - **[HTTP](docs/outputs/http.md)** - Send to HTTP/HTTPS endpoints (webhooks, APIs)
 - **[AWS SQS](docs/outputs/sqs.md)** - Send to SQS queues (single or batch mode)
 - **[Redis Streams](docs/outputs/redis-streams.md)** - Send to Redis Streams with length management
+- **[Redis Pub/Sub](docs/outputs/redis-pubsub.md)** - Publish to Redis Pub/Sub channels
+- **[Redis Lists](docs/outputs/redis-list.md)** - Push to Redis Lists (LPUSH/RPUSH queues)
 
 ### 🚀 Advanced Features
 

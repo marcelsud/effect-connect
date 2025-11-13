@@ -1,5 +1,5 @@
 /**
- * Redis Streams Output - Sends messages to Redis Streams
+ * Redis Pub/Sub Output - Publishes messages to Redis Pub/Sub channels
  */
 import { Effect, Schedule } from "effect";
 import * as Schema from "effect/Schema";
@@ -24,16 +24,15 @@ import {
   RetryCount,
 } from "../core/validation.js";
 
-export interface RedisStreamsOutputConfig {
+export interface RedisPubSubOutputConfig {
   readonly host: string;
   readonly port: number;
-  readonly stream: string;
-  readonly maxLen?: number;
+  readonly channel: string; // Can use template interpolation like "events:{{content.type}}"
   readonly password?: string;
   readonly db?: number;
-  readonly maxRetries?: number; // Added for retry configuration
+  readonly maxRetries?: number; // Retry configuration (default: 3)
 
-  // Connection pooling configuration
+  // Connection configuration
   readonly connectTimeout?: number; // Connection timeout in ms (default: 10000)
   readonly commandTimeout?: number; // Command timeout in ms (default: undefined)
   readonly keepAlive?: number; // TCP keep-alive in ms (default: 30000)
@@ -42,8 +41,8 @@ export interface RedisStreamsOutputConfig {
   readonly enableOfflineQueue?: boolean; // Queue commands when offline (default: true)
 }
 
-export class RedisOutputError extends ComponentError {
-  readonly _tag = "RedisOutputError";
+export class RedisPubSubOutputError extends ComponentError {
+  readonly _tag = "RedisPubSubOutputError";
 
   constructor(
     message: string,
@@ -55,13 +54,12 @@ export class RedisOutputError extends ComponentError {
 }
 
 /**
- * Validation schema for Redis Streams Output configuration
+ * Validation schema for Redis Pub/Sub Output configuration
  */
-export const RedisStreamsOutputConfigSchema = Schema.Struct({
+export const RedisPubSubOutputConfigSchema = Schema.Struct({
   host: Schema.Union(Hostname, NonEmptyString),
   port: Port,
-  stream: NonEmptyString,
-  maxLen: Schema.optional(PositiveInt),
+  channel: NonEmptyString,
   password: Schema.optional(NonEmptyString),
   db: Schema.optional(Schema.Int.pipe(Schema.nonNegative())),
   maxRetries: Schema.optional(RetryCount),
@@ -74,20 +72,42 @@ export const RedisStreamsOutputConfigSchema = Schema.Struct({
 });
 
 /**
- * Create a Redis Streams output
+ * Interpolate channel template with message data
+ * Supports templates like "events:{{content.type}}" or "user:{{metadata.userId}}"
  */
-export const createRedisStreamsOutput = (
-  config: RedisStreamsOutputConfig,
-): Output<RedisOutputError> => {
+const interpolateChannel = (template: string, msg: Message): string => {
+  return template.replace(/\{\{([^}]+)\}\}/g, (_, path) => {
+    const parts = path.trim().split(".");
+    let value: any = msg;
+
+    for (const part of parts) {
+      value = value?.[part];
+      if (value === undefined || value === null) {
+        return "";
+      }
+    }
+
+    return String(value);
+  });
+};
+
+/**
+ * Create a Redis Pub/Sub output
+ */
+export const createRedisPubSubOutput = (
+  config: RedisPubSubOutputConfig,
+): Output<RedisPubSubOutputError> => {
   // Validate configuration synchronously at creation time
   Effect.runSync(
     validate(
-      RedisStreamsOutputConfigSchema,
+      RedisPubSubOutputConfigSchema,
       config,
-      "Redis Streams Output configuration",
+      "Redis Pub/Sub Output configuration",
     ).pipe(
       Effect.catchAll((error) =>
-        Effect.fail(new RedisOutputError(error.message, error.category, error)),
+        Effect.fail(
+          new RedisPubSubOutputError(error.message, error.category, error),
+        ),
       ),
     ),
   );
@@ -113,52 +133,39 @@ export const createRedisStreamsOutput = (
   const connectionInfo = `redis://${config.host}:${config.port}/${config.db || 0}`;
 
   // Metrics tracking
-  const metrics = new MetricsAccumulator("redis-streams-output");
+  const metrics = new MetricsAccumulator("redis-pubsub-output");
   let messageCount = 0;
 
   return {
-    name: "redis-streams-output",
-    send: (msg: Message): Effect.Effect<void, RedisOutputError> => {
+    name: "redis-pubsub-output",
+    send: (msg: Message): Effect.Effect<void, RedisPubSubOutputError> => {
       return Effect.gen(function* () {
         // Log connection on first send (INFO level)
-        yield* Effect.logInfo(`Connected to Redis stream: ${connectionInfo}`);
+        yield* Effect.logInfo(`Connected to Redis Pub/Sub: ${connectionInfo}`);
 
-        // Prepare fields for XADD with trace context
-        const fields: Record<string, string> = {
+        // Interpolate channel name with message data
+        const channel = interpolateChannel(config.channel, msg);
+
+        // Prepare message payload (serialize entire message as JSON)
+        const payload = JSON.stringify({
           id: msg.id,
-          correlationId: msg.correlationId || "",
-          timestamp: msg.timestamp.toString(),
-          content: JSON.stringify(msg.content),
-          metadata: JSON.stringify(msg.metadata),
-          // Preserve trace context
-          trace: msg.trace ? JSON.stringify(msg.trace) : "",
-        };
+          correlationId: msg.correlationId,
+          timestamp: msg.timestamp,
+          content: msg.content,
+          metadata: msg.metadata,
+          trace: msg.trace,
+        });
 
-        // Send with retry logic
-        const [_, duration] = yield* measureDuration(
+        // Publish with retry logic
+        const [numSubscribers, duration] = yield* measureDuration(
           Effect.tryPromise({
             try: async () => {
-              // Use XADD command
-              if (config.maxLen) {
-                await client.xadd(
-                  config.stream,
-                  "MAXLEN",
-                  "~",
-                  config.maxLen,
-                  "*",
-                  ...Object.entries(fields).flat(),
-                );
-              } else {
-                await client.xadd(
-                  config.stream,
-                  "*",
-                  ...Object.entries(fields).flat(),
-                );
-              }
+              // PUBLISH returns number of subscribers that received the message
+              return await client.publish(channel, payload);
             },
             catch: (error) =>
-              new RedisOutputError(
-                `Failed to send message to Redis stream ${config.stream}: ${error instanceof Error ? error.message : String(error)}`,
+              new RedisPubSubOutputError(
+                `Failed to publish message to channel ${channel}: ${error instanceof Error ? error.message : String(error)}`,
                 detectCategory(error),
                 error,
               ),
@@ -171,11 +178,18 @@ export const createRedisStreamsOutput = (
             Effect.tapError((error) => {
               metrics.recordSendError();
               return Effect.logError(
-                `Redis send failed after ${config.maxRetries ?? 3} retries: ${error.message}`,
+                `Redis publish failed after ${config.maxRetries ?? 3} retries: ${error.message}`,
               );
             }),
           ),
         );
+
+        // Log warning if no subscribers received the message
+        if (numSubscribers === 0) {
+          yield* Effect.logWarning(
+            `Published message ${msg.id} to channel ${channel} but no subscribers were listening`,
+          );
+        }
 
         // Record successful send
         metrics.recordSent(1, duration);
@@ -189,7 +203,7 @@ export const createRedisStreamsOutput = (
 
         // Log successful send (DEBUG level)
         yield* Effect.logDebug(
-          `Sent message ${msg.id} to stream ${config.stream}`,
+          `Published message ${msg.id} to channel ${channel} (${numSubscribers} subscribers)`,
         );
       });
     },

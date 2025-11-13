@@ -5,11 +5,19 @@
  * without N×N test explosion.
  */
 
-export { createGenerateInput, type GenerateInputConfig, GenerateInputConfigSchema } from "./generate-input.js"
-export { createCaptureOutput, type CaptureOutput, type CaptureOutputConfig } from "./capture-output.js"
+export {
+  createGenerateInput,
+  type GenerateInputConfig,
+  GenerateInputConfigSchema,
+} from "./generate-input.js";
+export {
+  createCaptureOutput,
+  type CaptureOutput,
+  type CaptureOutputConfig,
+} from "./capture-output.js";
 export {
   createAssertProcessor,
   type AssertProcessorConfig,
   AssertProcessorConfigSchema,
-  AssertProcessorError
-} from "./assert-processor.js"
+  AssertProcessorError,
+} from "./assert-processor.js";

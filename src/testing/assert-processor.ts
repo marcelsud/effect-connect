@@ -2,17 +2,17 @@
  * Assert Processor - Validates messages during pipeline execution
  * Used for inline assertions and message structure validation
  */
-import { Effect } from "effect"
-import * as Schema from "effect/Schema"
-import jsonata from "jsonata"
-import type { Processor, Message } from "../core/types.js"
-import { ComponentError, type ErrorCategory } from "../core/errors.js"
+import { Effect } from "effect";
+import * as Schema from "effect/Schema";
+import jsonata from "jsonata";
+import type { Processor, Message } from "../core/types.js";
+import { ComponentError, type ErrorCategory } from "../core/errors.js";
 
 export interface AssertProcessorConfig {
-  readonly condition?: string // JSONata expression that must evaluate to true
-  readonly hasFields?: readonly string[] // Required fields in content
-  readonly error?: string // Custom error message
-  readonly logPassing?: boolean // Log when assertions pass (default: false)
+  readonly condition?: string; // JSONata expression that must evaluate to true
+  readonly hasFields?: readonly string[]; // Required fields in content
+  readonly error?: string; // Custom error message
+  readonly logPassing?: boolean; // Log when assertions pass (default: false)
 }
 
 /**
@@ -22,15 +22,15 @@ export const AssertProcessorConfigSchema = Schema.Struct({
   condition: Schema.optional(Schema.String),
   hasFields: Schema.optional(Schema.Array(Schema.String)),
   error: Schema.optional(Schema.String),
-  logPassing: Schema.optional(Schema.Boolean)
-})
+  logPassing: Schema.optional(Schema.Boolean),
+});
 
 export class AssertProcessorError extends ComponentError {
-  readonly _tag = "AssertProcessorError"
-  readonly category: ErrorCategory = "logical"
+  readonly _tag = "AssertProcessorError";
+  readonly category: ErrorCategory = "logical";
 
   constructor(message: string, cause?: unknown) {
-    super(message, cause)
+    super(message, cause);
   }
 }
 
@@ -38,20 +38,20 @@ export class AssertProcessorError extends ComponentError {
  * Check if object has nested field using dot notation
  */
 const hasNestedField = (obj: unknown, path: string): boolean => {
-  if (obj === null || obj === undefined) return false
+  if (obj === null || obj === undefined) return false;
 
-  const parts = path.split(".")
-  let current: any = obj
+  const parts = path.split(".");
+  let current: any = obj;
 
   for (const part of parts) {
     if (typeof current !== "object" || current === null || !(part in current)) {
-      return false
+      return false;
     }
-    current = current[part]
+    current = current[part];
   }
 
-  return current !== undefined
-}
+  return current !== undefined;
+};
 
 /**
  * Create Assert Processor
@@ -68,11 +68,18 @@ const hasNestedField = (obj: unknown, path: string): boolean => {
  * })
  * ```
  */
-export const createAssertProcessor = (config: AssertProcessorConfig = {}): Processor<AssertProcessorError> => {
-  const { condition, hasFields, error: customError, logPassing = false } = config
+export const createAssertProcessor = (
+  config: AssertProcessorConfig = {},
+): Processor<AssertProcessorError> => {
+  const {
+    condition,
+    hasFields,
+    error: customError,
+    logPassing = false,
+  } = config;
 
   // Pre-compile JSONata expression for performance
-  const compiledExpression = condition ? jsonata(condition) : null
+  const compiledExpression = condition ? jsonata(condition) : null;
 
   return {
     name: "assert-processor",
@@ -82,15 +89,16 @@ export const createAssertProcessor = (config: AssertProcessorConfig = {}): Proce
         // Check required fields
         if (hasFields && hasFields.length > 0) {
           for (const field of hasFields) {
-            const hasField = hasNestedField(message.content, field)
+            const hasField = hasNestedField(message.content, field);
             if (!hasField) {
-              const errorMsg = customError ?? `Assertion failed: Missing field '${field}'`
+              const errorMsg =
+                customError ?? `Assertion failed: Missing field '${field}'`;
               return yield* Effect.fail(
                 new AssertProcessorError(
                   `${errorMsg} (messageId: ${message.id})`,
-                  new Error(`Field '${field}' not found in message content`)
-                )
-              )
+                  new Error(`Field '${field}' not found in message content`),
+                ),
+              );
             }
           }
         }
@@ -102,27 +110,29 @@ export const createAssertProcessor = (config: AssertProcessorConfig = {}): Proce
             catch: (error) =>
               new AssertProcessorError(
                 `Failed to evaluate condition: ${condition}`,
-                error
-              )
-          })
+                error,
+              ),
+          });
 
           if (!result) {
-            const errorMsg = customError ?? `Assertion failed: Condition '${condition}' evaluated to false`
+            const errorMsg =
+              customError ??
+              `Assertion failed: Condition '${condition}' evaluated to false`;
             return yield* Effect.fail(
               new AssertProcessorError(
-                `${errorMsg} (messageId: ${message.id})`
-              )
-            )
+                `${errorMsg} (messageId: ${message.id})`,
+              ),
+            );
           }
         }
 
         // Log if passing and configured
         if (logPassing) {
-          yield* Effect.logDebug(`Assertion passed for message: ${message.id}`)
+          yield* Effect.logDebug(`Assertion passed for message: ${message.id}`);
         }
 
         // Pass through message unchanged
-        return message
-      })
-  }
-}
+        return message;
+      }),
+  };
+};

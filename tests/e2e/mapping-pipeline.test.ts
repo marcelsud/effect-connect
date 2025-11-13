@@ -1,10 +1,10 @@
-import { describe, it, expect } from "vitest"
-import { Effect, Stream } from "effect"
-import { createMessage } from "../../src/core/types.js"
-import { createMappingProcessor } from "../../src/processors/mapping-processor.js"
-import { createMetadataProcessor } from "../../src/processors/metadata-processor.js"
-import { create, run } from "../../src/core/pipeline.js"
-import type { Message, Output } from "../../src/core/types.js"
+import { describe, it, expect } from "vitest";
+import { Effect, Stream } from "effect";
+import { createMessage } from "../../src/core/types.js";
+import { createMappingProcessor } from "../../src/processors/mapping-processor.js";
+import { createMetadataProcessor } from "../../src/processors/metadata-processor.js";
+import { create, run } from "../../src/core/pipeline.js";
+import type { Message, Output } from "../../src/core/types.js";
 
 describe("E2E: Mapping Pipeline", () => {
   it("should process e-commerce orders with complex JSONata transformations", async () => {
@@ -32,21 +32,23 @@ describe("E2E: Mapping Pipeline", () => {
           email: "JANE@EXAMPLE.COM",
           tier: "silver",
         },
-        items: [{ sku: "DESK-P1", name: "standing desk", price: 599.0, qty: 1 }],
+        items: [
+          { sku: "DESK-P1", name: "standing desk", price: 599.0, qty: 1 },
+        ],
         shipping: { state: "NY" },
       }),
-    ]
+    ];
 
     const mockInput = {
       name: "mock-input",
       stream: Stream.fromIterable(orderMessages),
-    }
+    };
 
     // Metadata processor: add correlation ID
     const metadataProcessor = createMetadataProcessor({
       correlationIdField: "correlationId",
       addTimestamp: true,
-    })
+    });
 
     // Mapping processor: complex transformation
     const mappingProcessor = createMappingProcessor({
@@ -85,17 +87,17 @@ describe("E2E: Mapping Pipeline", () => {
           }
         )
       `,
-    })
+    });
 
     // Mock output that collects results
-    const processedOrders: Message[] = []
+    const processedOrders: Message[] = [];
     const mockOutput: Output = {
       name: "mock-output",
       send: (msg: Message) =>
         Effect.sync(() => {
-          processedOrders.push(msg)
+          processedOrders.push(msg);
         }),
-    }
+    };
 
     // Create and run pipeline
     const pipeline = create({
@@ -103,52 +105,52 @@ describe("E2E: Mapping Pipeline", () => {
       input: mockInput,
       processors: [metadataProcessor, mappingProcessor],
       output: mockOutput,
-    })
+    });
 
-    const result = await Effect.runPromise(run(pipeline))
+    const result = await Effect.runPromise(run(pipeline));
 
     // Assertions
-    expect(result.success).toBe(true)
-    expect(result.stats.processed).toBe(2)
-    expect(result.stats.failed).toBe(0)
-    expect(processedOrders).toHaveLength(2)
+    expect(result.success).toBe(true);
+    expect(result.stats.processed).toBe(2);
+    expect(result.stats.failed).toBe(0);
+    expect(processedOrders).toHaveLength(2);
 
     // Sort orders by orderId to handle concurrent processing
     const sortedOrders = processedOrders.sort((a, b) =>
-      a.content.orderId.localeCompare(b.content.orderId)
-    )
+      a.content.orderId.localeCompare(b.content.orderId),
+    );
 
     // Verify first order (gold tier, CA tax)
-    const order1 = sortedOrders[0].content
-    expect(order1.orderId).toBe("ORD-001")
-    expect(order1.customer.fullName).toBe("JOHN DOE")
-    expect(order1.customer.email).toBe("john@example.com")
-    expect(order1.customer.discountRate).toBe("15%")
+    const order1 = sortedOrders[0].content;
+    expect(order1.orderId).toBe("ORD-001");
+    expect(order1.customer.fullName).toBe("JOHN DOE");
+    expect(order1.customer.email).toBe("john@example.com");
+    expect(order1.customer.discountRate).toBe("15%");
 
     // Check transformed items
-    expect(order1.items).toHaveLength(2)
-    expect(order1.items[0].name).toBe("GAMING LAPTOP")
-    expect(order1.items[1].name).toBe("WIRELESS MOUSE")
-    expect(order1.items[1].total).toBe(99.98)
+    expect(order1.items).toHaveLength(2);
+    expect(order1.items[0].name).toBe("GAMING LAPTOP");
+    expect(order1.items[1].name).toBe("WIRELESS MOUSE");
+    expect(order1.items[1].total).toBe(99.98);
 
     // Check pricing calculations
-    expect(order1.pricing.subtotal).toBeCloseTo(1399.97)
-    expect(order1.pricing.discount).toBeCloseTo(209.9955)
-    expect(order1.itemCount).toBe(2)
-    expect(order1.categories).toContain("LAPTOP")
-    expect(order1.categories).toContain("MOUSE")
+    expect(order1.pricing.subtotal).toBeCloseTo(1399.97);
+    expect(order1.pricing.discount).toBeCloseTo(209.9955);
+    expect(order1.itemCount).toBe(2);
+    expect(order1.categories).toContain("LAPTOP");
+    expect(order1.categories).toContain("MOUSE");
 
     // Verify second order (silver tier, NY tax)
-    const order2 = sortedOrders[1].content
-    expect(order2.customer.fullName).toBe("JANE SMITH")
-    expect(order2.customer.discountRate).toBe("10%")
-    expect(order2.itemCount).toBe(1)
+    const order2 = sortedOrders[1].content;
+    expect(order2.customer.fullName).toBe("JANE SMITH");
+    expect(order2.customer.discountRate).toBe("10%");
+    expect(order2.itemCount).toBe(1);
 
     // Verify metadata was added
-    expect(processedOrders[0].correlationId).toBeDefined()
-    expect(processedOrders[0].metadata.processedBy).toBe("metadata-processor")
-    expect(processedOrders[0].metadata.mappingApplied).toBe(true)
-  })
+    expect(processedOrders[0].correlationId).toBeDefined();
+    expect(processedOrders[0].metadata.processedBy).toBe("metadata-processor");
+    expect(processedOrders[0].metadata.mappingApplied).toBe(true);
+  });
 
   it("should handle IoT sensor data aggregation", async () => {
     const sensorMessages = [
@@ -162,12 +164,12 @@ describe("E2E: Mapping Pipeline", () => {
         ],
         location: { building: "HQ", floor: 3, room: "server-room-a" },
       }),
-    ]
+    ];
 
     const mockInput = {
       name: "mock-input",
       stream: Stream.fromIterable(sensorMessages),
-    }
+    };
 
     const mappingProcessor = createMappingProcessor({
       expression: `
@@ -201,70 +203,70 @@ describe("E2E: Mapping Pipeline", () => {
           }
         )
       `,
-    })
+    });
 
-    const processedData: Message[] = []
+    const processedData: Message[] = [];
     const mockOutput: Output = {
       name: "mock-output",
       send: (msg: Message) =>
         Effect.sync(() => {
-          processedData.push(msg)
+          processedData.push(msg);
         }),
-    }
+    };
 
     const pipeline = create({
       name: "iot-pipeline",
       input: mockInput,
       processors: [mappingProcessor],
       output: mockOutput,
-    })
+    });
 
-    const result = await Effect.runPromise(run(pipeline))
+    const result = await Effect.runPromise(run(pipeline));
 
-    expect(result.success).toBe(true)
-    expect(processedData).toHaveLength(1)
+    expect(result.success).toBe(true);
+    expect(processedData).toHaveLength(1);
 
-    const analyzed = processedData[0].content
-    expect(analyzed.device.location).toBe("HQ/3/server-room-a")
-    expect(analyzed.analysis.temperature.average).toBeCloseTo(24.2, 1)
-    expect(analyzed.analysis.temperature.max).toBe(26.2)
-    expect(analyzed.analysis.temperature.min).toBe(22.5)
-    expect(analyzed.analysis.temperature.trend).toBe("rising")
-    expect(analyzed.alert).toBeDefined()
-    expect(analyzed.alert.severity).toBe("warning")
-    expect(analyzed.readingCount).toBe(4)
-  })
+    const analyzed = processedData[0].content;
+    expect(analyzed.device.location).toBe("HQ/3/server-room-a");
+    expect(analyzed.analysis.temperature.average).toBeCloseTo(24.2, 1);
+    expect(analyzed.analysis.temperature.max).toBe(26.2);
+    expect(analyzed.analysis.temperature.min).toBe(22.5);
+    expect(analyzed.analysis.temperature.trend).toBe("rising");
+    expect(analyzed.alert).toBeDefined();
+    expect(analyzed.alert.severity).toBe("warning");
+    expect(analyzed.readingCount).toBe(4);
+  });
 
   it("should handle empty input gracefully", async () => {
     const mockInput = {
       name: "mock-input",
       stream: Stream.empty,
-    }
+    };
 
     const mappingProcessor = createMappingProcessor({
       expression: `{ "result": value }`,
-    })
+    });
 
-    const processedData: Message[] = []
+    const processedData: Message[] = [];
     const mockOutput: Output = {
       name: "mock-output",
       send: (msg: Message) =>
         Effect.sync(() => {
-          processedData.push(msg)
+          processedData.push(msg);
         }),
-    }
+    };
 
     const pipeline = create({
       name: "empty-pipeline",
       input: mockInput,
       processors: [mappingProcessor],
       output: mockOutput,
-    })
+    });
 
-    const result = await Effect.runPromise(run(pipeline))
+    const result = await Effect.runPromise(run(pipeline));
 
-    expect(result.success).toBe(true)
-    expect(result.stats.processed).toBe(0)
-    expect(processedData).toHaveLength(0)
-  })
-})
+    expect(result.success).toBe(true);
+    expect(result.stats.processed).toBe(0);
+    expect(processedData).toHaveLength(0);
+  });
+});

@@ -1,5 +1,5 @@
 /**
- * Redis Streams Output - Sends messages to Redis Streams
+ * Redis List Output - Pushes messages to Redis Lists
  */
 import { Effect, Schedule } from "effect";
 import * as Schema from "effect/Schema";
@@ -24,16 +24,19 @@ import {
   RetryCount,
 } from "../core/validation.js";
 
-export interface RedisStreamsOutputConfig {
+export interface RedisListOutputConfig {
   readonly host: string;
   readonly port: number;
-  readonly stream: string;
-  readonly maxLen?: number;
+  readonly key: string; // List key (can use template interpolation)
   readonly password?: string;
   readonly db?: number;
-  readonly maxRetries?: number; // Added for retry configuration
 
-  // Connection pooling configuration
+  // Push configuration
+  readonly direction?: "left" | "right"; // LPUSH (left) or RPUSH (right) (default: "right")
+  readonly maxLen?: number; // Optional max length (uses LTRIM to cap list size)
+  readonly maxRetries?: number; // Retry configuration (default: 3)
+
+  // Connection configuration
   readonly connectTimeout?: number; // Connection timeout in ms (default: 10000)
   readonly commandTimeout?: number; // Command timeout in ms (default: undefined)
   readonly keepAlive?: number; // TCP keep-alive in ms (default: 30000)
@@ -42,8 +45,8 @@ export interface RedisStreamsOutputConfig {
   readonly enableOfflineQueue?: boolean; // Queue commands when offline (default: true)
 }
 
-export class RedisOutputError extends ComponentError {
-  readonly _tag = "RedisOutputError";
+export class RedisListOutputError extends ComponentError {
+  readonly _tag = "RedisListOutputError";
 
   constructor(
     message: string,
@@ -55,15 +58,16 @@ export class RedisOutputError extends ComponentError {
 }
 
 /**
- * Validation schema for Redis Streams Output configuration
+ * Validation schema for Redis List Output configuration
  */
-export const RedisStreamsOutputConfigSchema = Schema.Struct({
+export const RedisListOutputConfigSchema = Schema.Struct({
   host: Schema.Union(Hostname, NonEmptyString),
   port: Port,
-  stream: NonEmptyString,
-  maxLen: Schema.optional(PositiveInt),
+  key: NonEmptyString,
   password: Schema.optional(NonEmptyString),
   db: Schema.optional(Schema.Int.pipe(Schema.nonNegative())),
+  direction: Schema.optional(Schema.Literal("left", "right")),
+  maxLen: Schema.optional(PositiveInt),
   maxRetries: Schema.optional(RetryCount),
   connectTimeout: Schema.optional(PositiveInt),
   commandTimeout: Schema.optional(PositiveInt),
@@ -74,20 +78,42 @@ export const RedisStreamsOutputConfigSchema = Schema.Struct({
 });
 
 /**
- * Create a Redis Streams output
+ * Interpolate key template with message data
+ * Supports templates like "queue:{{content.type}}" or "tasks:{{metadata.priority}}"
  */
-export const createRedisStreamsOutput = (
-  config: RedisStreamsOutputConfig,
-): Output<RedisOutputError> => {
+const interpolateKey = (template: string, msg: Message): string => {
+  return template.replace(/\{\{([^}]+)\}\}/g, (_, path) => {
+    const parts = path.trim().split(".");
+    let value: any = msg;
+
+    for (const part of parts) {
+      value = value?.[part];
+      if (value === undefined || value === null) {
+        return "";
+      }
+    }
+
+    return String(value);
+  });
+};
+
+/**
+ * Create a Redis List output
+ */
+export const createRedisListOutput = (
+  config: RedisListOutputConfig,
+): Output<RedisListOutputError> => {
   // Validate configuration synchronously at creation time
   Effect.runSync(
     validate(
-      RedisStreamsOutputConfigSchema,
+      RedisListOutputConfigSchema,
       config,
-      "Redis Streams Output configuration",
+      "Redis List Output configuration",
     ).pipe(
       Effect.catchAll((error) =>
-        Effect.fail(new RedisOutputError(error.message, error.category, error)),
+        Effect.fail(
+          new RedisListOutputError(error.message, error.category, error),
+        ),
       ),
     ),
   );
@@ -109,56 +135,58 @@ export const createRedisStreamsOutput = (
     },
   });
 
+  const direction = config.direction ?? "right";
+
   // Log connection info
   const connectionInfo = `redis://${config.host}:${config.port}/${config.db || 0}`;
 
   // Metrics tracking
-  const metrics = new MetricsAccumulator("redis-streams-output");
+  const metrics = new MetricsAccumulator("redis-list-output");
   let messageCount = 0;
 
   return {
-    name: "redis-streams-output",
-    send: (msg: Message): Effect.Effect<void, RedisOutputError> => {
+    name: "redis-list-output",
+    send: (msg: Message): Effect.Effect<void, RedisListOutputError> => {
       return Effect.gen(function* () {
         // Log connection on first send (INFO level)
-        yield* Effect.logInfo(`Connected to Redis stream: ${connectionInfo}`);
+        yield* Effect.logInfo(`Connected to Redis: ${connectionInfo}`);
 
-        // Prepare fields for XADD with trace context
-        const fields: Record<string, string> = {
+        // Interpolate key name with message data
+        const key = interpolateKey(config.key, msg);
+
+        // Prepare message payload (serialize entire message as JSON)
+        const payload = JSON.stringify({
           id: msg.id,
-          correlationId: msg.correlationId || "",
-          timestamp: msg.timestamp.toString(),
-          content: JSON.stringify(msg.content),
-          metadata: JSON.stringify(msg.metadata),
-          // Preserve trace context
-          trace: msg.trace ? JSON.stringify(msg.trace) : "",
-        };
+          correlationId: msg.correlationId,
+          timestamp: msg.timestamp,
+          content: msg.content,
+          metadata: msg.metadata,
+          trace: msg.trace,
+        });
 
-        // Send with retry logic
-        const [_, duration] = yield* measureDuration(
+        // Push with retry logic
+        const [listLength, duration] = yield* measureDuration(
           Effect.tryPromise({
             try: async () => {
-              // Use XADD command
-              if (config.maxLen) {
-                await client.xadd(
-                  config.stream,
-                  "MAXLEN",
-                  "~",
-                  config.maxLen,
-                  "*",
-                  ...Object.entries(fields).flat(),
-                );
+              // Push to list
+              let length: number;
+              if (direction === "left") {
+                length = await client.lpush(key, payload);
               } else {
-                await client.xadd(
-                  config.stream,
-                  "*",
-                  ...Object.entries(fields).flat(),
-                );
+                length = await client.rpush(key, payload);
               }
+
+              // Trim list if maxLen is configured
+              if (config.maxLen && length > config.maxLen) {
+                await client.ltrim(key, 0, config.maxLen - 1);
+                return config.maxLen;
+              }
+
+              return length;
             },
             catch: (error) =>
-              new RedisOutputError(
-                `Failed to send message to Redis stream ${config.stream}: ${error instanceof Error ? error.message : String(error)}`,
+              new RedisListOutputError(
+                `Failed to push message to Redis list ${key}: ${error instanceof Error ? error.message : String(error)}`,
                 detectCategory(error),
                 error,
               ),
@@ -171,7 +199,7 @@ export const createRedisStreamsOutput = (
             Effect.tapError((error) => {
               metrics.recordSendError();
               return Effect.logError(
-                `Redis send failed after ${config.maxRetries ?? 3} retries: ${error.message}`,
+                `Redis push failed after ${config.maxRetries ?? 3} retries: ${error.message}`,
               );
             }),
           ),
@@ -189,7 +217,7 @@ export const createRedisStreamsOutput = (
 
         // Log successful send (DEBUG level)
         yield* Effect.logDebug(
-          `Sent message ${msg.id} to stream ${config.stream}`,
+          `Pushed message ${msg.id} to ${direction} of list ${key} (length: ${listLength})`,
         );
       });
     },

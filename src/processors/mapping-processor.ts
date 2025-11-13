@@ -1,17 +1,20 @@
 /**
  * Mapping Processor - JSONata-based transformations
  */
-import { Effect } from "effect"
-import jsonata from "jsonata"
-import type { Processor, Message } from "../core/types.js"
+import { Effect } from "effect";
+import jsonata from "jsonata";
+import type { Processor, Message } from "../core/types.js";
 
 export interface MappingProcessorConfig {
-  readonly expression: string
+  readonly expression: string;
 }
 
 export class MappingError {
-  readonly _tag = "MappingError"
-  constructor(readonly message: string, readonly cause?: unknown) {}
+  readonly _tag = "MappingError";
+  constructor(
+    readonly message: string,
+    readonly cause?: unknown,
+  ) {}
 }
 
 /**
@@ -19,16 +22,16 @@ export class MappingError {
  * Enables declarative data transformations similar to Bloblang
  */
 export const createMappingProcessor = (
-  config: MappingProcessorConfig
+  config: MappingProcessorConfig,
 ): Processor<MappingError> => {
   // Compile JSONata expression once during processor creation
-  let compiledExpression: ReturnType<typeof jsonata>
+  let compiledExpression: ReturnType<typeof jsonata>;
 
   try {
-    compiledExpression = jsonata(config.expression)
+    compiledExpression = jsonata(config.expression);
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error)
-    throw new Error(`Failed to compile JSONata expression: ${errorMessage}`)
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to compile JSONata expression: ${errorMessage}`);
   }
 
   return {
@@ -37,17 +40,17 @@ export const createMappingProcessor = (
       return Effect.gen(function* () {
         // Prepare context for JSONata evaluation
         const context =
-          typeof msg.content === 'object' && msg.content !== null
+          typeof msg.content === "object" && msg.content !== null
             ? msg.content
-            : { value: msg.content }
+            : { value: msg.content };
 
         // Bind special variables using JSONata's assign method
-        compiledExpression.assign('message', {
+        compiledExpression.assign("message", {
           id: msg.id,
           timestamp: msg.timestamp,
           correlationId: msg.correlationId,
-        })
-        compiledExpression.assign('meta', msg.metadata)
+        });
+        compiledExpression.assign("meta", msg.metadata);
 
         // Evaluate JSONata expression
         const result = yield* Effect.tryPromise({
@@ -55,9 +58,9 @@ export const createMappingProcessor = (
           catch: (error) =>
             new MappingError(
               `JSONata evaluation failed: ${error instanceof Error ? error.message : String(error)}`,
-              error
+              error,
             ),
-        })
+        });
 
         // Return transformed message
         return {
@@ -68,8 +71,8 @@ export const createMappingProcessor = (
             mappingApplied: true,
             mappingExpression: config.expression.slice(0, 100), // First 100 chars for tracking
           },
-        }
-      })
+        };
+      });
     },
-  }
-}
+  };
+};

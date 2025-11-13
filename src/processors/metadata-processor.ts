@@ -1,12 +1,12 @@
 /**
  * Metadata Processor - Adds correlation ID and metadata to messages
  */
-import { Effect } from "effect"
-import type { Processor, Message } from "../core/types.js"
+import { Effect } from "effect";
+import type { Processor, Message } from "../core/types.js";
 
 export interface MetadataProcessorConfig {
-  readonly correlationIdField?: string
-  readonly addTimestamp?: boolean
+  readonly correlationIdField?: string;
+  readonly addTimestamp?: boolean;
 }
 
 /**
@@ -14,10 +14,10 @@ export interface MetadataProcessorConfig {
  * Adds correlation ID and additional metadata to messages
  */
 export const createMetadataProcessor = (
-  config: MetadataProcessorConfig = {}
+  config: MetadataProcessorConfig = {},
 ): Processor => {
-  const correlationIdField = config.correlationIdField || "correlationId"
-  const addTimestamp = config.addTimestamp ?? true
+  const correlationIdField = config.correlationIdField || "correlationId";
+  const addTimestamp = config.addTimestamp ?? true;
 
   return {
     name: "metadata-processor",
@@ -25,16 +25,18 @@ export const createMetadataProcessor = (
       return Effect.sync(() => {
         // Generate correlation ID if not present
         const correlationId =
-          msg.correlationId || (msg.metadata[correlationIdField] as string) || crypto.randomUUID()
+          msg.correlationId ||
+          (msg.metadata[correlationIdField] as string) ||
+          crypto.randomUUID();
 
         // Build additional metadata
         const additionalMetadata: Record<string, unknown> = {
           [correlationIdField]: correlationId,
           processedBy: "metadata-processor",
-        }
+        };
 
         if (addTimestamp) {
-          additionalMetadata.processedAt = new Date().toISOString()
+          additionalMetadata.processedAt = new Date().toISOString();
         }
 
         // Return enhanced message
@@ -45,8 +47,8 @@ export const createMetadataProcessor = (
             ...msg.metadata,
             ...additionalMetadata,
           },
-        }
-      })
+        };
+      });
     },
-  }
-}
+  };
+};

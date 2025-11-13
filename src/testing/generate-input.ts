@@ -2,17 +2,17 @@
  * Generate Input - Creates test messages from templates
  * Used for testing outputs and processors without external dependencies
  */
-import { Effect, Stream } from "effect"
-import * as Schema from "effect/Schema"
-import { randomUUID } from "node:crypto"
-import type { Input } from "../core/types.js"
-import { createMessage } from "../core/types.js"
+import { Effect, Stream } from "effect";
+import * as Schema from "effect/Schema";
+import { randomUUID } from "node:crypto";
+import type { Input } from "../core/types.js";
+import { createMessage } from "../core/types.js";
 
 export interface GenerateInputConfig {
-  readonly count: number
-  readonly interval?: number // milliseconds between messages
-  readonly template: Record<string, unknown> // Template with {{placeholders}}
-  readonly startIndex?: number // Starting index (default: 0)
+  readonly count: number;
+  readonly interval?: number; // milliseconds between messages
+  readonly template: Record<string, unknown>; // Template with {{placeholders}}
+  readonly startIndex?: number; // Starting index (default: 0)
 }
 
 /**
@@ -22,8 +22,8 @@ export const GenerateInputConfigSchema = Schema.Struct({
   count: Schema.Int.pipe(Schema.positive()),
   interval: Schema.optional(Schema.Int.pipe(Schema.nonNegative())),
   template: Schema.Record({ key: Schema.String, value: Schema.Unknown }),
-  startIndex: Schema.optional(Schema.Int.pipe(Schema.nonNegative()))
-})
+  startIndex: Schema.optional(Schema.Int.pipe(Schema.nonNegative())),
+});
 
 /**
  * Replace template placeholders with generated values
@@ -34,23 +34,23 @@ const replacePlaceholders = (template: unknown, index: number): unknown => {
       .replace(/\{\{index\}\}/g, String(index))
       .replace(/\{\{uuid\}\}/g, randomUUID())
       .replace(/\{\{random\}\}/g, String(Math.floor(Math.random() * 1000)))
-      .replace(/\{\{timestamp\}\}/g, String(Date.now()))
+      .replace(/\{\{timestamp\}\}/g, String(Date.now()));
   }
 
   if (Array.isArray(template)) {
-    return template.map((item) => replacePlaceholders(item, index))
+    return template.map((item) => replacePlaceholders(item, index));
   }
 
   if (template !== null && typeof template === "object") {
-    const result: Record<string, unknown> = {}
+    const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(template)) {
-      result[key] = replacePlaceholders(value, index)
+      result[key] = replacePlaceholders(value, index);
     }
-    return result
+    return result;
   }
 
-  return template
-}
+  return template;
+};
 
 /**
  * Create Generate Input
@@ -69,34 +69,37 @@ const replacePlaceholders = (template: unknown, index: number): unknown => {
  * ```
  */
 export const createGenerateInput = (config: GenerateInputConfig): Input => {
-  const startIndex = config.startIndex ?? 0
-  const interval = config.interval ?? 0
+  const startIndex = config.startIndex ?? 0;
+  const interval = config.interval ?? 0;
 
   // Create an array of indices to generate
-  const indices = Array.from({ length: config.count }, (_, i) => startIndex + i)
+  const indices = Array.from(
+    { length: config.count },
+    (_, i) => startIndex + i,
+  );
 
   const stream = Stream.fromIterable(indices).pipe(
     // Add delay between messages if interval is specified
     Stream.mapEffect((index) =>
       Effect.gen(function* () {
         if (interval > 0 && index > startIndex) {
-          yield* Effect.sleep(`${interval} millis`)
+          yield* Effect.sleep(`${interval} millis`);
         }
 
         // Generate message from template
-        const content = replacePlaceholders(config.template, index)
+        const content = replacePlaceholders(config.template, index);
 
         return createMessage(content, {
           source: "generate-input",
           testIndex: index,
-          generatedAt: new Date().toISOString()
-        })
-      })
-    )
-  )
+          generatedAt: new Date().toISOString(),
+        });
+      }),
+    ),
+  );
 
   return {
     name: "generate-input",
-    stream
-  }
-}
+    stream,
+  };
+};

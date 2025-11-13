@@ -1,26 +1,32 @@
 /**
  * Configuration loader and validator using Effect Schema
  */
-import { Effect, pipe } from "effect"
-import * as S from "effect/Schema"
-import * as yaml from "yaml"
-import * as fs from "node:fs/promises"
+import { Effect, pipe } from "effect";
+import * as S from "effect/Schema";
+import * as yaml from "yaml";
+import * as fs from "node:fs/promises";
 
 /**
  * Custom errors for config loading
  */
 export class FileReadError {
-  readonly _tag = "FileReadError"
-  constructor(readonly path: string, readonly cause: unknown) {}
+  readonly _tag = "FileReadError";
+  constructor(
+    readonly path: string,
+    readonly cause: unknown,
+  ) {}
 }
 
 export class YamlParseError {
-  readonly _tag = "YamlParseError"
-  constructor(readonly message: string, readonly cause?: unknown) {}
+  readonly _tag = "YamlParseError";
+  constructor(
+    readonly message: string,
+    readonly cause?: unknown,
+  ) {}
 }
 
 export class ConfigValidationError {
-  readonly _tag = "ConfigValidationError"
+  readonly _tag = "ConfigValidationError";
   constructor(readonly message: string) {}
 }
 
@@ -33,13 +39,13 @@ const AwsSqsInputSchema = S.Struct({
   endpoint: S.optional(S.String),
   wait_time_seconds: S.optional(S.Number),
   max_number_of_messages: S.optional(S.Number),
-})
+});
 
 /**
  * Schema for Redis Streams Input configuration (Bento style)
  */
 const RedisStreamsInputSchema = S.Struct({
-  url: S.String,  // redis://host:port format
+  url: S.String, // redis://host:port format
   stream: S.String,
   mode: S.optional(S.Union(S.Literal("simple"), S.Literal("consumer-group"))),
   consumer_group: S.optional(S.String),
@@ -47,7 +53,7 @@ const RedisStreamsInputSchema = S.Struct({
   block_ms: S.optional(S.Number),
   count: S.optional(S.Number),
   start_id: S.optional(S.String),
-})
+});
 
 /**
  * Schema for HTTP Input configuration (Bento style)
@@ -57,7 +63,7 @@ const HttpInputSchema = S.Struct({
   host: S.optional(S.String),
   path: S.optional(S.String),
   timeout: S.optional(S.Number),
-})
+});
 
 /**
  * Input configuration - detects type by key
@@ -68,7 +74,7 @@ const InputConfigSchema = S.Struct({
   http: S.optional(HttpInputSchema),
   // Future inputs can be added here:
   // kafka: S.optional(KafkaInputSchema),
-})
+});
 
 /**
  * Schema for Metadata Processor (Bento style)
@@ -76,29 +82,36 @@ const InputConfigSchema = S.Struct({
 const MetadataProcessorSchema = S.Struct({
   correlation_id_field: S.optional(S.String),
   add_timestamp: S.optional(S.Boolean),
-})
+});
 
 /**
  * Schema for Uppercase Processor (Bento style)
  */
 const UppercaseProcessorSchema = S.Struct({
   fields: S.Array(S.String),
-})
+});
 
 /**
  * Schema for Logging Processor (Bento style)
  */
 const LogProcessorSchema = S.Struct({
-  level: S.optional(S.Union(S.Literal("debug"), S.Literal("info"), S.Literal("warn"), S.Literal("error"))),
+  level: S.optional(
+    S.Union(
+      S.Literal("debug"),
+      S.Literal("info"),
+      S.Literal("warn"),
+      S.Literal("error"),
+    ),
+  ),
   include_content: S.optional(S.Boolean),
-})
+});
 
 /**
  * Schema for Mapping Processor (JSONata-based transformations)
  */
 const MappingProcessorSchema = S.Struct({
   expression: S.String,
-})
+});
 
 /**
  * Processor configuration - each processor is an object with its type as key
@@ -110,7 +123,7 @@ const ProcessorConfigSchema = S.Struct({
   mapping: S.optional(MappingProcessorSchema),
   // Future processors can be added here:
   // filter: S.optional(FilterProcessorSchema),
-})
+});
 
 /**
  * Schema for Redis Streams Output (Bento style)
@@ -119,7 +132,7 @@ const RedisStreamsOutputSchema = S.Struct({
   url: S.String,
   stream: S.String,
   max_length: S.optional(S.Number),
-})
+});
 
 /**
  * Schema for AWS SQS Output configuration (Bento style)
@@ -130,14 +143,16 @@ const AwsSqsOutputSchema = S.Struct({
   endpoint: S.optional(S.String),
   max_batch_size: S.optional(S.Number),
   delay_seconds: S.optional(S.Number),
-})
+});
 
 /**
  * Schema for HTTP Output configuration (Bento style)
  */
 const HttpOutputSchema = S.Struct({
   url: S.String,
-  method: S.optional(S.Union(S.Literal("POST"), S.Literal("PUT"), S.Literal("PATCH"))),
+  method: S.optional(
+    S.Union(S.Literal("POST"), S.Literal("PUT"), S.Literal("PATCH")),
+  ),
   headers: S.optional(S.Record({ key: S.String, value: S.String })),
   timeout: S.optional(S.Number),
   max_retries: S.optional(S.Number),
@@ -147,9 +162,9 @@ const HttpOutputSchema = S.Struct({
       username: S.optional(S.String),
       password: S.optional(S.String),
       token: S.optional(S.String),
-    })
+    }),
   ),
-})
+});
 
 /**
  * Output configuration - detects type by key
@@ -160,7 +175,7 @@ const OutputConfigSchema = S.Struct({
   http: S.optional(HttpOutputSchema),
   // Future outputs can be added here:
   // postgres: S.optional(PostgresOutputSchema),
-})
+});
 
 /**
  * Complete pipeline configuration schema (Bento style)
@@ -170,18 +185,18 @@ export const PipelineConfigSchema = S.Struct({
   pipeline: S.optional(
     S.Struct({
       processors: S.optional(S.Array(ProcessorConfigSchema)),
-    })
+    }),
   ),
   output: OutputConfigSchema,
-})
+});
 
 /**
  * TypeScript type inferred from schema
  */
-export type PipelineConfig = S.Schema.Type<typeof PipelineConfigSchema>
-export type InputConfig = S.Schema.Type<typeof InputConfigSchema>
-export type ProcessorConfig = S.Schema.Type<typeof ProcessorConfigSchema>
-export type OutputConfig = S.Schema.Type<typeof OutputConfigSchema>
+export type PipelineConfig = S.Schema.Type<typeof PipelineConfigSchema>;
+export type InputConfig = S.Schema.Type<typeof InputConfigSchema>;
+export type ProcessorConfig = S.Schema.Type<typeof ProcessorConfigSchema>;
+export type OutputConfig = S.Schema.Type<typeof OutputConfigSchema>;
 
 /**
  * Interpolate environment variables in strings
@@ -190,45 +205,47 @@ export type OutputConfig = S.Schema.Type<typeof OutputConfigSchema>
 export const interpolateEnvVars = (value: unknown): unknown => {
   if (typeof value === "string") {
     return value.replace(/\$\{([^}]+)\}/g, (_, varName) => {
-      return process.env[varName] || ""
-    })
+      return process.env[varName] || "";
+    });
   }
 
   if (Array.isArray(value)) {
-    return value.map(interpolateEnvVars)
+    return value.map(interpolateEnvVars);
   }
 
   if (value !== null && typeof value === "object") {
     return Object.fromEntries(
-      Object.entries(value).map(([k, v]) => [k, interpolateEnvVars(v)])
-    )
+      Object.entries(value).map(([k, v]) => [k, interpolateEnvVars(v)]),
+    );
   }
 
-  return value
-}
+  return value;
+};
 
 /**
  * Load and parse YAML configuration file
  */
 export const loadConfig = (
-  path: string
-): Effect.Effect<PipelineConfig, FileReadError | YamlParseError | ConfigValidationError> => {
+  path: string,
+): Effect.Effect<
+  PipelineConfig,
+  FileReadError | YamlParseError | ConfigValidationError
+> => {
   return Effect.gen(function* () {
     // Read file
     const content = yield* Effect.tryPromise({
       try: () => fs.readFile(path, "utf-8"),
       catch: (error) => new FileReadError(path, error),
-    })
+    });
 
     // Parse YAML
     const rawConfig = yield* Effect.try({
       try: () => yaml.parse(content),
-      catch: (error) =>
-        new YamlParseError("Failed to parse YAML", error),
-    })
+      catch: (error) => new YamlParseError("Failed to parse YAML", error),
+    });
 
     // Interpolate environment variables
-    const interpolated = interpolateEnvVars(rawConfig)
+    const interpolated = interpolateEnvVars(rawConfig);
 
     // Validate with schema
     const config = yield* pipe(
@@ -236,11 +253,11 @@ export const loadConfig = (
       Effect.mapError(
         (error) =>
           new ConfigValidationError(
-            `Schema validation failed: ${String(error)}`
-          )
-      )
-    )
+            `Schema validation failed: ${String(error)}`,
+          ),
+      ),
+    );
 
-    return config
-  })
-}
+    return config;
+  });
+};

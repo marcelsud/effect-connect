@@ -2,11 +2,11 @@
  * Capture Output - Collects messages in memory for testing assertions
  * Used for validating inputs and processors without external dependencies
  */
-import { Effect, Ref } from "effect"
-import type { Output, Message } from "../core/types.js"
+import { Effect, Ref } from "effect";
+import type { Output, Message } from "../core/types.js";
 
 export interface CaptureOutputConfig {
-  readonly maxMessages?: number // Limit captured messages (prevent memory issues)
+  readonly maxMessages?: number; // Limit captured messages (prevent memory issues)
 }
 
 /**
@@ -16,17 +16,17 @@ export interface CaptureOutput extends Output {
   /**
    * Get all captured messages
    */
-  getMessages: () => Effect.Effect<readonly Message[]>
+  getMessages: () => Effect.Effect<readonly Message[]>;
 
   /**
    * Get count of captured messages
    */
-  getCount: () => Effect.Effect<number>
+  getCount: () => Effect.Effect<number>;
 
   /**
    * Clear captured messages
    */
-  clear: () => Effect.Effect<void>
+  clear: () => Effect.Effect<void>;
 }
 
 /**
@@ -46,45 +46,51 @@ export interface CaptureOutput extends Output {
  * expect(messages[0].content).toEqual({ id: "msg-0" })
  * ```
  */
-export const createCaptureOutput = (config: CaptureOutputConfig = {}): Effect.Effect<CaptureOutput> =>
+export const createCaptureOutput = (
+  config: CaptureOutputConfig = {},
+): Effect.Effect<CaptureOutput> =>
   Effect.gen(function* () {
-    const maxMessages = config.maxMessages ?? 10000
-    const messagesRef = yield* Ref.make<Message[]>([])
+    const maxMessages = config.maxMessages ?? 10000;
+    const messagesRef = yield* Ref.make<Message[]>([]);
 
     return {
       name: "capture-output",
 
       send: (message: Message) =>
         Effect.gen(function* () {
-          const messages = yield* Ref.get(messagesRef)
+          const messages = yield* Ref.get(messagesRef);
 
           // Prevent memory issues with very large test runs
           if (messages.length >= maxMessages) {
             yield* Effect.logWarning(
-              `Capture output reached max capacity (${maxMessages}). Dropping message.`
-            )
-            return
+              `Capture output reached max capacity (${maxMessages}). Dropping message.`,
+            );
+            return;
           }
 
-          yield* Ref.update(messagesRef, (msgs) => [...msgs, message])
-          yield* Effect.logDebug(`Captured message: ${message.id}`)
+          yield* Ref.update(messagesRef, (msgs) => [...msgs, message]);
+          yield* Effect.logDebug(`Captured message: ${message.id}`);
         }),
 
       getMessages: () => Ref.get(messagesRef),
 
       getCount: () =>
         Effect.gen(function* () {
-          const messages = yield* Ref.get(messagesRef)
-          return messages.length
+          const messages = yield* Ref.get(messagesRef);
+          return messages.length;
         }),
 
       clear: () => Ref.set(messagesRef, []),
 
       close: () =>
         Effect.gen(function* () {
-          const count = yield* Ref.get(messagesRef).pipe(Effect.map((msgs) => msgs.length))
-          yield* Effect.log(`Capture output closing with ${count} captured messages`)
+          const count = yield* Ref.get(messagesRef).pipe(
+            Effect.map((msgs) => msgs.length),
+          );
+          yield* Effect.log(
+            `Capture output closing with ${count} captured messages`,
+          );
           // Don't clear messages on close - they need to be available for test assertions
-        })
-    }
-  })
+        }),
+    };
+  });

@@ -1,19 +1,27 @@
 /**
  * SQS Input - Consumes messages from AWS SQS (works with LocalStack)
  */
-import { Effect, Stream, Schedule } from "effect"
-import * as Schema from "effect/Schema"
+import { Effect, Stream, Schedule } from "effect";
+import * as Schema from "effect/Schema";
 import {
   SQSClient,
   ReceiveMessageCommand,
   DeleteMessageCommand,
   type Message as SQSMessage,
-} from "@aws-sdk/client-sqs"
-import { NodeHttpHandler } from "@smithy/node-http-handler"
-import type { Input, Message } from "../core/types.js"
-import { createMessage } from "../core/types.js"
-import { ComponentError, type ErrorCategory, detectCategory } from "../core/errors.js"
-import { MetricsAccumulator, emitInputMetrics, measureDuration } from "../core/metrics.js"
+} from "@aws-sdk/client-sqs";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
+import type { Input, Message } from "../core/types.js";
+import { createMessage } from "../core/types.js";
+import {
+  ComponentError,
+  type ErrorCategory,
+  detectCategory,
+} from "../core/errors.js";
+import {
+  MetricsAccumulator,
+  emitInputMetrics,
+  measureDuration,
+} from "../core/metrics.js";
 import {
   validate,
   NonEmptyString,
@@ -22,18 +30,18 @@ import {
   SqsMaxMessages,
   RetryCount,
   UrlString,
-} from "../core/validation.js"
+} from "../core/validation.js";
 
 export interface SqsInputConfig {
-  readonly queueUrl: string
-  readonly region?: string
-  readonly endpoint?: string
-  readonly waitTimeSeconds?: number
-  readonly maxMessages?: number
+  readonly queueUrl: string;
+  readonly region?: string;
+  readonly endpoint?: string;
+  readonly waitTimeSeconds?: number;
+  readonly maxMessages?: number;
   // Connection configuration
-  readonly maxAttempts?: number        // Max retry attempts (default: 3)
-  readonly requestTimeout?: number     // Request timeout in ms (default: 0 = no timeout)
-  readonly connectionTimeout?: number  // Connection timeout in ms (default: 1000)
+  readonly maxAttempts?: number; // Max retry attempts (default: 3)
+  readonly requestTimeout?: number; // Request timeout in ms (default: 0 = no timeout)
+  readonly connectionTimeout?: number; // Connection timeout in ms (default: 1000)
 }
 
 /**
@@ -48,17 +56,17 @@ export const SqsInputConfigSchema = Schema.Struct({
   maxAttempts: Schema.optional(RetryCount),
   requestTimeout: Schema.optional(Schema.Int.pipe(Schema.nonNegative())),
   connectionTimeout: Schema.optional(TimeoutMs),
-})
+});
 
 export class SqsInputError extends ComponentError {
-  readonly _tag = "SqsInputError"
+  readonly _tag = "SqsInputError";
 
   constructor(
     message: string,
     readonly category: ErrorCategory,
-    cause?: unknown
+    cause?: unknown,
   ) {
-    super(message, cause)
+    super(message, cause);
   }
 }
 
@@ -66,14 +74,16 @@ export class SqsInputError extends ComponentError {
  * Create an SQS input source
  */
 export const createSqsInput = (
-  config: SqsInputConfig
+  config: SqsInputConfig,
 ): Input<SqsInputError> => {
   // Validate configuration synchronously at creation time
-  Effect.runSync(validate(SqsInputConfigSchema, config, "SQS Input configuration").pipe(
-    Effect.catchAll((error) =>
-      Effect.fail(new SqsInputError(error.message, error.category, error))
-    )
-  ))
+  Effect.runSync(
+    validate(SqsInputConfigSchema, config, "SQS Input configuration").pipe(
+      Effect.catchAll((error) =>
+        Effect.fail(new SqsInputError(error.message, error.category, error)),
+      ),
+    ),
+  );
 
   const client = new SQSClient({
     region: config.region || "us-east-1",
@@ -90,35 +100,32 @@ export const createSqsInput = (
       connectionTimeout: config.connectionTimeout ?? 1000,
       socketTimeout: config.requestTimeout ?? 0,
     }),
-  })
+  });
 
   // Metrics tracking
-  const metrics = new MetricsAccumulator("sqs-input")
-  let messageCount = 0
+  const metrics = new MetricsAccumulator("sqs-input");
+  let messageCount = 0;
 
   /**
    * Poll SQS for messages with retry logic
    */
-  const pollMessages = (): Effect.Effect<
-    SQSMessage[],
-    SqsInputError
-  > => {
+  const pollMessages = (): Effect.Effect<SQSMessage[], SqsInputError> => {
     return Effect.tryPromise({
       try: async () => {
         const command = new ReceiveMessageCommand({
           QueueUrl: config.queueUrl,
           MaxNumberOfMessages: config.maxMessages || 10,
           WaitTimeSeconds: config.waitTimeSeconds || 20,
-        })
+        });
 
-        const response = await client.send(command)
-        return response.Messages || []
+        const response = await client.send(command);
+        return response.Messages || [];
       },
       catch: (error) =>
         new SqsInputError(
           "Failed to receive messages from SQS",
           detectCategory(error),
-          error
+          error,
         ),
     }).pipe(
       Effect.retry({
@@ -126,45 +133,43 @@ export const createSqsInput = (
         schedule: Schedule.exponential("1 second"),
       }),
       Effect.tapError((error) =>
-        Effect.logError(
-          `SQS polling failed after 3 retries: ${error.message}`
-        )
-      )
-    )
-  }
+        Effect.logError(`SQS polling failed after 3 retries: ${error.message}`),
+      ),
+    );
+  };
 
   /**
    * Delete message from SQS after processing
    */
   const deleteMessage = (
-    receiptHandle: string
+    receiptHandle: string,
   ): Effect.Effect<void, SqsInputError> => {
     return Effect.tryPromise({
       try: async () => {
         const command = new DeleteMessageCommand({
           QueueUrl: config.queueUrl,
           ReceiptHandle: receiptHandle,
-        })
-        await client.send(command)
+        });
+        await client.send(command);
       },
       catch: (error) =>
         new SqsInputError(
           "Failed to delete message from SQS",
           detectCategory(error),
-          error
+          error,
         ),
-    })
-  }
+    });
+  };
 
   /**
    * Convert SQS message to our Message format
    */
   const convertMessage = (sqsMsg: SQSMessage): Message => {
-    let content: unknown
+    let content: unknown;
     try {
-      content = sqsMsg.Body ? JSON.parse(sqsMsg.Body) : {}
+      content = sqsMsg.Body ? JSON.parse(sqsMsg.Body) : {};
     } catch {
-      content = { raw: sqsMsg.Body }
+      content = { raw: sqsMsg.Body };
     }
 
     return createMessage(content, {
@@ -175,24 +180,27 @@ export const createSqsInput = (
       receiptHandle: sqsMsg.ReceiptHandle,
       attributes: sqsMsg.Attributes,
       messageAttributes: sqsMsg.MessageAttributes,
-    })
-  }
+    });
+  };
 
   /**
    * Create a stream that continuously polls SQS
    */
   const stream = Stream.repeatEffect(
     Effect.gen(function* () {
-      yield* Effect.logInfo("Polling SQS for messages...")
+      yield* Effect.logInfo("Polling SQS for messages...");
 
-      const [sqsMessages, pollDuration] = yield* measureDuration(pollMessages())
+      const [sqsMessages, pollDuration] =
+        yield* measureDuration(pollMessages());
 
       if (sqsMessages.length === 0) {
-        yield* Effect.logDebug("No messages received, continuing to poll...")
-        return []
+        yield* Effect.logDebug("No messages received, continuing to poll...");
+        return [];
       }
 
-      yield* Effect.logDebug(`Received ${sqsMessages.length} messages from SQS`)
+      yield* Effect.logDebug(
+        `Received ${sqsMessages.length} messages from SQS`,
+      );
 
       // Convert and delete messages
       const [messages, processDuration] = yield* measureDuration(
@@ -200,62 +208,62 @@ export const createSqsInput = (
           sqsMessages,
           (sqsMsg) =>
             Effect.gen(function* () {
-              const message = convertMessage(sqsMsg)
+              const message = convertMessage(sqsMsg);
 
               // Delete from queue after conversion
               if (sqsMsg.ReceiptHandle) {
                 yield* deleteMessage(sqsMsg.ReceiptHandle).pipe(
                   Effect.catchAll((error) => {
-                    metrics.recordError()
+                    metrics.recordError();
                     return Effect.logError(
-                      `Failed to delete message ${sqsMsg.MessageId}: ${error}`
-                    )
-                  })
-                )
+                      `Failed to delete message ${sqsMsg.MessageId}: ${error}`,
+                    );
+                  }),
+                );
               }
 
-              return message
+              return message;
             }),
-          { concurrency: 5 }
-        )
-      )
+          { concurrency: 5 },
+        ),
+      );
 
       // Record metrics
-      const totalDuration = pollDuration + processDuration
+      const totalDuration = pollDuration + processDuration;
       messages.forEach(() => {
-        metrics.recordProcessed(totalDuration / messages.length)
-        messageCount++
-      })
+        metrics.recordProcessed(totalDuration / messages.length);
+        messageCount++;
+      });
 
       // Emit metrics every 100 messages
       if (messageCount >= 100) {
-        yield* emitInputMetrics(metrics.getInputMetrics())
-        messageCount = 0
+        yield* emitInputMetrics(metrics.getInputMetrics());
+        messageCount = 0;
       }
 
-      return messages
-    })
+      return messages;
+    }),
   ).pipe(
     Stream.flatMap((messages) => Stream.fromIterable(messages)),
     Stream.catchAll((error) =>
       Stream.fromEffect(
         Effect.gen(function* () {
-          metrics.recordError()
-          yield* Effect.logError(`SQS stream error: ${error}`)
+          metrics.recordError();
+          yield* Effect.logError(`SQS stream error: ${error}`);
           // Wait before retrying
-          yield* Effect.sleep("5 seconds")
-          return [] as Message[]
-        })
-      ).pipe(Stream.flatMap((msgs) => Stream.fromIterable(msgs)))
-    )
-  )
+          yield* Effect.sleep("5 seconds");
+          return [] as Message[];
+        }),
+      ).pipe(Stream.flatMap((msgs) => Stream.fromIterable(msgs))),
+    ),
+  );
 
   return {
     name: "sqs-input",
     stream,
     close: () =>
       Effect.sync(() => {
-        client.destroy()
+        client.destroy();
       }),
-  }
-}
+  };
+};

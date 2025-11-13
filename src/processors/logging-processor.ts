@@ -1,12 +1,12 @@
 /**
  * Logging Processor - Logs messages passing through the pipeline
  */
-import { Effect } from "effect"
-import type { Processor, Message } from "../core/types.js"
+import { Effect } from "effect";
+import type { Processor, Message } from "../core/types.js";
 
 export interface LoggingProcessorConfig {
-  readonly level?: "debug" | "info" | "warn" | "error"
-  readonly includeContent?: boolean
+  readonly level?: "debug" | "info" | "warn" | "error";
+  readonly includeContent?: boolean;
 }
 
 /**
@@ -14,10 +14,10 @@ export interface LoggingProcessorConfig {
  * Logs messages with structured information
  */
 export const createLoggingProcessor = (
-  config: LoggingProcessorConfig = {}
+  config: LoggingProcessorConfig = {},
 ): Processor => {
-  const level = config.level || "info"
-  const includeContent = config.includeContent ?? true
+  const level = config.level || "info";
+  const includeContent = config.includeContent ?? true;
 
   return {
     name: "logging-processor",
@@ -28,9 +28,9 @@ export const createLoggingProcessor = (
         timestamp: msg.timestamp,
         metadata: msg.metadata,
         ...(includeContent ? { content: msg.content } : {}),
-      }
+      };
 
-      const logMessage = `Processing message: ${JSON.stringify(logData, null, 2)}`
+      const logMessage = `Processing message: ${JSON.stringify(logData, null, 2)}`;
 
       // Choose appropriate log level
       const logEffect =
@@ -40,12 +40,12 @@ export const createLoggingProcessor = (
             ? Effect.logWarning(logMessage)
             : level === "error"
               ? Effect.logError(logMessage)
-              : Effect.log(logMessage)
+              : Effect.log(logMessage);
 
       return Effect.gen(function* () {
-        yield* logEffect
-        return msg
-      })
+        yield* logEffect;
+        return msg;
+      });
     },
-  }
-}
+  };
+};
