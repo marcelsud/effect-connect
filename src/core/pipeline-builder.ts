@@ -14,6 +14,10 @@ import { createMappingProcessor } from "../processors/mapping-processor.js"
 import { createRedisStreamsOutput } from "../outputs/redis-streams-output.js"
 import { createSqsOutput } from "../outputs/sqs-output.js"
 import { createHttpOutput } from "../outputs/http-output.js"
+// Testing utilities
+import { createGenerateInput } from "../testing/generate-input.js"
+import { createCaptureOutput } from "../testing/capture-output.js"
+import { createAssertProcessor } from "../testing/assert-processor.js"
 
 export class BuildError {
   readonly _tag = "BuildError"
@@ -96,6 +100,11 @@ const buildInputInternal = (config: InputConfig): Effect.Effect<Input<any>, Buil
     )
   }
 
+  // Testing utility: generate input
+  if ((config as any).generate) {
+    return Effect.succeed(createGenerateInput((config as any).generate))
+  }
+
   return Effect.fail(new BuildError("No valid input configuration found"))
 }
 
@@ -138,6 +147,11 @@ const buildProcessor = (config: ProcessorConfig): Effect.Effect<Processor<any>, 
         expression: config.mapping.expression,
       })
     )
+  }
+
+  // Testing utility: assert processor
+  if ((config as any).assert) {
+    return Effect.succeed(createAssertProcessor((config as any).assert))
   }
 
   return Effect.fail(new BuildError("No valid processor configuration found"))
@@ -204,6 +218,11 @@ const buildOutput = (config: OutputConfig): Effect.Effect<Output<any>, BuildErro
         auth: config.http.auth,
       })
     )
+  }
+
+  // Testing utility: capture output
+  if ((config as any).capture) {
+    return createCaptureOutput((config as any).capture || {})
   }
 
   return Effect.fail(new BuildError("No valid output configuration found"))

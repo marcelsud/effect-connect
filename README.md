@@ -11,6 +11,7 @@ Build type-safe data pipelines with YAML configuration for message processing.
 
 - **Declarative YAML Configuration** - Define pipelines without code
 - **Type-Safe** - Built with TypeScript and Effect.js for compile-time safety
+- **YAML Testing** - Declarative test runner with 10 assertion types
 - **Stream Processing** - Handle high-throughput message streams efficiently
 - **Backpressure Control** - Prevent overwhelming downstream systems
 - **Dead Letter Queue (DLQ)** - Graceful failure handling with automatic retries
@@ -342,22 +343,63 @@ expect(messages).toHaveLength(5)
 - ✅ Linear test growth: N components = ~3N tests (not N²)
 - ✅ Fast execution: 228 tests in < 10 seconds
 
+#### YAML Testing
+
+Test complete pipelines declaratively with YAML:
+
+```yaml
+name: Uppercase Processor Tests
+
+tests:
+  - name: "Should uppercase specified fields"
+    pipeline:
+      input:
+        generate:
+          count: 1
+          template:
+            name: "john doe"
+            city: "new york"
+
+      processors:
+        - uppercase:
+            fields: [name, city]
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: message_count
+        expected: 1
+      - type: field_value
+        message: 0
+        path: content.name
+        expected: "JOHN DOE"
+```
+
+Run YAML tests with:
+```bash
+effect-connect test "tests/**/*.yaml"
+```
+
 **See [docs/TESTING.md](./docs/TESTING.md) for complete testing guide.**
 
 ### Run Tests
 
 ```bash
-# All tests
-npm test
+# All unit tests
+npm run test
 
-# Unit tests only (228 tests)
-npm test:unit
+# Unit tests only
+npm run test:unit
 
 # E2E tests only
-npm test:e2e
+npm run test:e2e
+
+# YAML declarative tests
+effect-connect test "tests/yaml/**/*.yaml"
 
 # With coverage
-npm test:coverage
+npm run test:coverage
 ```
 
 ### Build

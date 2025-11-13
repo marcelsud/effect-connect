@@ -11,6 +11,7 @@ This document describes the testing strategy for Effect Connect, designed to sca
 - [Writing Component Tests](#writing-component-tests)
 - [Examples](#examples)
 - [Best Practices](#best-practices)
+- [YAML Testing](#yaml-testing)
 
 ---
 
@@ -829,7 +830,125 @@ With this approach, you can add 100 components with only 300 tests instead of 10
 
 ---
 
+## YAML Testing
+
+Effect Connect now includes a declarative YAML test runner for end-to-end testing of pipelines.
+
+### Overview
+
+YAML tests allow you to:
+- Test complete pipelines declaratively without writing code
+- Verify processor logic, assertions, and transformations
+- Run tests from the CLI with `effect-connect test`
+- Get formatted test output with pass/fail status
+
+### Running YAML Tests
+
+```bash
+# Run all YAML tests
+effect-connect test "tests/**/*.yaml"
+
+# Run specific test file
+effect-connect test tests/processors/uppercase.test.yaml
+
+# Run tests with debug output
+effect-connect test "tests/**/*.yaml" --debug
+```
+
+### Writing YAML Tests
+
+Create a `.yaml` file with the following structure:
+
+```yaml
+name: My Component Tests
+
+tests:
+  - name: "Test case description"
+    pipeline:
+      input:
+        generate:
+          count: 3
+          template:
+            field1: "value {{index}}"
+            field2: 123
+
+      processors:
+        - uppercase:
+            fields:
+              - field1
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: message_count
+        expected: 3
+
+      - type: field_value
+        message: 0
+        path: content.field1
+        expected: "VALUE 0"
+```
+
+### Available Assertions
+
+The YAML test runner supports 10 assertion types:
+
+**Message Count Assertions:**
+- `message_count`: Exact count
+- `message_count_less_than`: Count < N
+- `message_count_greater_than`: Count > N
+
+**Field Assertions:**
+- `field_value`: Check field equals expected value
+- `field_exists`: Verify field is present
+
+**Condition Assertions (JSONata):**
+- `all_match`: All messages match condition
+- `some_match`: At least one message matches
+- `none_match`: No messages match
+
+**Pipeline Status:**
+- `pipeline_success`: Pipeline completed successfully
+- `pipeline_failed`: Pipeline failed (for error tests)
+
+### Testing Error Scenarios
+
+Use `expectError` to test failure cases:
+
+```yaml
+- name: "Should fail on invalid input"
+  pipeline:
+    input:
+      generate:
+        count: 1
+        template:
+          value: 5
+
+    processors:
+      - assert:
+          condition: content.value > 10
+
+    output:
+      capture: {}
+
+  expectError:
+    messageContains: "Condition evaluated to false"
+```
+
+### Example Tests
+
+See `tests/yaml/processors/` for complete examples:
+- `uppercase.test.yaml` - Field transformation
+- `metadata.test.yaml` - Adding correlation IDs and timestamps
+- `mapping.test.yaml` - JSONata transformations
+- `assertions.test.yaml` - Advanced assertion patterns
+- `error-handling.test.yaml` - Error scenarios
+
+---
+
 **Next Steps:**
 - See [COMPONENTS.md](./spec/COMPONENTS.md) for component development guide
 - See [examples/](../examples/) for full pipeline examples
-- Run tests with `npm test` or `npm run test:unit`
+- Run unit tests with `npm test` or `npm run test:unit`
+- Run YAML tests with `effect-connect test "tests/**/*.yaml"`

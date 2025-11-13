@@ -1,0 +1,172 @@
+name: Mapping Processor Tests
+
+tests:
+  - name: "Should transform message using JSONata expression"
+    pipeline:
+      input:
+        generate:
+          count: 1
+          template:
+            firstName: "John"
+            lastName: "Doe"
+            age: 30
+
+      processors:
+        - mapping:
+            expression: |
+              {
+                "fullName": firstName & " " & lastName,
+                "age": age,
+                "isAdult": age >= 18
+              }
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: message_count
+        expected: 1
+
+      - type: field_value
+        message: 0
+        path: content.fullName
+        expected: "John Doe"
+
+      - type: field_value
+        message: 0
+        path: content.age
+        expected: 30
+
+      - type: field_value
+        message: 0
+        path: content.isAdult
+        expected: true
+
+  - name: "Should extract nested fields"
+    pipeline:
+      input:
+        generate:
+          count: 1
+          template:
+            user:
+              profile:
+                name: "Alice"
+                email: "alice@example.com"
+              settings:
+                theme: "dark"
+
+      processors:
+        - mapping:
+            expression: |
+              {
+                "userName": user.profile.name,
+                "userEmail": user.profile.email,
+                "theme": user.settings.theme
+              }
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: message_count
+        expected: 1
+
+      - type: field_value
+        message: 0
+        path: content.userName
+        expected: "Alice"
+
+      - type: field_value
+        message: 0
+        path: content.userEmail
+        expected: "alice@example.com"
+
+      - type: field_value
+        message: 0
+        path: content.theme
+        expected: "dark"
+
+  - name: "Should filter and transform arrays"
+    pipeline:
+      input:
+        generate:
+          count: 1
+          template:
+            items:
+              - name: "Item 1"
+                price: 10
+                inStock: true
+              - name: "Item 2"
+                price: 20
+                inStock: false
+              - name: "Item 3"
+                price: 15
+                inStock: true
+
+      processors:
+        - mapping:
+            expression: |
+              {
+                "inStockItems": items[inStock=true].name,
+                "totalInStock": $count(items[inStock=true])
+              }
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: message_count
+        expected: 1
+
+      - type: field_value
+        message: 0
+        path: content.inStockItems
+        expected:
+          - "Item 1"
+          - "Item 3"
+
+      - type: field_value
+        message: 0
+        path: content.totalInStock
+        expected: 2
+
+  - name: "Should handle numeric operations"
+    pipeline:
+      input:
+        generate:
+          count: 1
+          template:
+            price: 100
+            quantity: 3
+            taxRate: 0.1
+
+      processors:
+        - mapping:
+            expression: |
+              {
+                "subtotal": price * quantity,
+                "tax": price * quantity * taxRate,
+                "total": price * quantity * (1 + taxRate)
+              }
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: message_count
+        expected: 1
+
+      - type: field_value
+        message: 0
+        path: content.subtotal
+        expected: 300
+
+      - type: field_value
+        message: 0
+        path: content.tax
+        expected: 30
+
+      - type: field_value
+        message: 0
+        path: content.total
+        expected: 330

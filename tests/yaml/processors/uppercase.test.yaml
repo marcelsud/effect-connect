@@ -1,0 +1,103 @@
+name: Uppercase Processor Tests
+
+tests:
+  - name: "Should uppercase specified fields"
+    pipeline:
+      input:
+        generate:
+          count: 1
+          template:
+            name: "john doe"
+            email: "john@example.com"
+            city: "new york"
+
+      processors:
+        - uppercase:
+            fields:
+              - name
+              - city
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: message_count
+        expected: 1
+
+      - type: field_value
+        message: 0
+        path: content.name
+        expected: "JOHN DOE"
+
+      - type: field_value
+        message: 0
+        path: content.city
+        expected: "NEW YORK"
+
+      # Email should remain unchanged
+      - type: field_value
+        message: 0
+        path: content.email
+        expected: "john@example.com"
+
+  - name: "Should handle multiple messages"
+    pipeline:
+      input:
+        generate:
+          count: 3
+          template:
+            message: "hello world {{index}}"
+
+      processors:
+        - uppercase:
+            fields:
+              - message
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: message_count
+        expected: 3
+
+      - type: field_value
+        message: 0
+        path: content.message
+        expected: "HELLO WORLD 0"
+
+      - type: field_value
+        message: 1
+        path: content.message
+        expected: "HELLO WORLD 1"
+
+      - type: field_value
+        message: 2
+        path: content.message
+        expected: "HELLO WORLD 2"
+
+  - name: "Should handle missing fields gracefully"
+    pipeline:
+      input:
+        generate:
+          count: 1
+          template:
+            name: "alice"
+            # no 'description' field
+
+      processors:
+        - uppercase:
+            fields:
+              - name
+              - description  # This field doesn't exist
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: message_count
+        expected: 1
+
+      - type: field_value
+        message: 0
+        path: content.name
+        expected: "ALICE"

@@ -7,6 +7,7 @@ import { NodeRuntime } from "@effect/platform-node"
 import { loadConfig } from "./core/config-loader.js"
 import { buildPipeline } from "./core/pipeline-builder.js"
 import { run } from "./core/pipeline.js"
+import { runYamlTests, formatTestResults } from "./testing/yaml-test-runner.js"
 import { readFileSync } from "node:fs"
 import { fileURLToPath } from "node:url"
 import { dirname, join } from "node:path"
@@ -27,20 +28,22 @@ effect-connect v${appVersion}
 Declarative streaming library powered by Effect.js, inspired by Apache Camel and Benthos
 
 Usage:
-  effect-connect run <config-file.yaml> [options]
+  effect-connect <command> [options]
 
 Commands:
   run <config-file>    Run a pipeline from a YAML configuration file
+  test <pattern>       Run YAML tests matching the glob pattern
 
 Options:
   -h, --help          Show this help message
   -v, --version       Show version information
   --debug             Enable debug logging
 
-Example:
+Examples:
   effect-connect run configs/example-pipeline.yaml
   effect-connect run my-pipeline.yaml --debug
-  npx effect-connect run my-pipeline.yaml
+  effect-connect test "tests/**/*.yaml"
+  effect-connect test tests/processors/uppercase.test.yaml
 `)
 }
 
@@ -64,6 +67,34 @@ const main = Effect.gen(function* () {
 
   // Check for debug flag
   const debugMode = args.includes("--debug")
+
+  // Handle test command
+  if (args[0] === "test") {
+    const pattern = args.find(arg => !arg.startsWith("--") && arg !== "test")
+    if (!pattern) {
+      console.error("Error: Missing test pattern argument")
+      console.error('Usage: effect-connect test <pattern>')
+      console.error('Example: effect-connect test "tests/**/*.yaml"')
+      yield* Effect.fail(new Error("Missing test pattern"))
+      return
+    }
+
+    yield* Effect.log(`Running tests matching pattern: ${pattern}`)
+
+    // Run YAML tests
+    const result = yield* runYamlTests(pattern)
+
+    // Display formatted results
+    console.log(formatTestResults(result))
+
+    // Exit with appropriate code
+    if (result.failedTests > 0) {
+      yield* Effect.fail(new Error("Some tests failed"))
+    } else {
+      yield* Effect.log("All tests passed!")
+    }
+    return
+  }
 
   // Check for run command
   if (args[0] !== "run") {
@@ -186,5 +217,5 @@ const debugMode = process.argv.includes("--debug")
 NodeRuntime.runMain(
   main.pipe(
     Logger.withMinimumLogLevel(debugMode ? LogLevel.Debug : LogLevel.Info)
-  )
+  ) as Effect.Effect<void>
 )

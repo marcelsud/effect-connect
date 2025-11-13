@@ -1,0 +1,135 @@
+name: Metadata Processor Tests
+
+tests:
+  - name: "Should add correlation ID to messages"
+    pipeline:
+      input:
+        generate:
+          count: 2
+          template:
+            data: "test message {{index}}"
+
+      processors:
+        - metadata:
+            correlation_id_field: correlationId
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: message_count
+        expected: 2
+
+      # Both messages should have correlationId field in metadata
+      - type: field_exists
+        message: 0
+        path: metadata.correlationId
+
+      - type: field_exists
+        message: 1
+        path: metadata.correlationId
+
+      # Data should remain unchanged
+      - type: field_value
+        message: 0
+        path: content.data
+        expected: "test message 0"
+
+  - name: "Should add timestamp when configured"
+    pipeline:
+      input:
+        generate:
+          count: 1
+          template:
+            payload: "test"
+
+      processors:
+        - metadata:
+            add_timestamp: true
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: message_count
+        expected: 1
+
+      # Timestamp field should exist in metadata
+      - type: field_exists
+        message: 0
+        path: metadata.processedAt
+
+      # Original payload should be preserved
+      - type: field_value
+        message: 0
+        path: content.payload
+        expected: "test"
+
+  - name: "Should add both correlation ID and timestamp"
+    pipeline:
+      input:
+        generate:
+          count: 1
+          template:
+            value: 42
+
+      processors:
+        - metadata:
+            correlation_id_field: requestId
+            add_timestamp: true
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: message_count
+        expected: 1
+
+      - type: field_exists
+        message: 0
+        path: metadata.requestId
+
+      - type: field_exists
+        message: 0
+        path: metadata.processedAt
+
+      - type: field_value
+        message: 0
+        path: content.value
+        expected: 42
+
+  - name: "Should work with existing metadata"
+    pipeline:
+      input:
+        generate:
+          count: 1
+          template:
+            existingField: "should remain"
+            userId: 123
+
+      processors:
+        - metadata:
+            correlation_id_field: traceId
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: message_count
+        expected: 1
+
+      # New field added to metadata
+      - type: field_exists
+        message: 0
+        path: metadata.traceId
+
+      # Existing fields preserved
+      - type: field_value
+        message: 0
+        path: content.existingField
+        expected: "should remain"
+
+      - type: field_value
+        message: 0
+        path: content.userId
+        expected: 123

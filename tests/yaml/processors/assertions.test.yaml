@@ -1,0 +1,188 @@
+name: Advanced Assertion Tests
+
+tests:
+  - name: "Should verify all messages match a condition"
+    pipeline:
+      input:
+        generate:
+          count: 3
+          template:
+            status: "active"
+            value: "{{index}}"
+
+      processors: []
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: message_count
+        expected: 3
+
+      # All messages should have status = "active"
+      - type: all_match
+        condition: content.status = "active"
+
+  - name: "Should verify some messages match a condition"
+    pipeline:
+      input:
+        generate:
+          count: 5
+          template:
+            value: "{{index}}"
+
+      processors:
+        - mapping:
+            expression: |
+              {
+                "value": $number(value),
+                "isEven": $number(value) % 2 = 0
+              }
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: message_count
+        expected: 5
+
+      # At least some messages should have isEven = true (0, 2, 4)
+      - type: some_match
+        condition: content.isEven = true
+
+      # At least some messages should have isEven = false (1, 3)
+      - type: some_match
+        condition: content.isEven = false
+
+  - name: "Should verify none of the messages match a condition"
+    pipeline:
+      input:
+        generate:
+          count: 3
+          template:
+            status: "pending"
+            priority: "high"
+
+      processors: []
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: message_count
+        expected: 3
+
+      # No messages should have status = "completed"
+      - type: none_match
+        condition: content.status = "completed"
+
+      # No messages should have priority = "low"
+      - type: none_match
+        condition: content.priority = "low"
+
+  - name: "Should verify message count comparisons"
+    pipeline:
+      input:
+        generate:
+          count: 10
+          template:
+            id: "{{index}}"
+
+      processors: []
+
+      output:
+        capture: {}
+
+    assertions:
+      # Exact count
+      - type: message_count
+        expected: 10
+
+      # Greater than
+      - type: message_count_greater_than
+        expected: 5
+
+      # Less than
+      - type: message_count_less_than
+        expected: 20
+
+  - name: "Should combine multiple processors and assertions"
+    pipeline:
+      input:
+        generate:
+          count: 3
+          template:
+            name: "user {{index}}"
+            age: "{{index}}"
+
+      processors:
+        - mapping:
+            expression: |
+              {
+                "name": name,
+                "age": $number(age) + 20,
+                "category": $number(age) + 20 >= 21 ? "adult" : "minor"
+              }
+
+        - metadata:
+            correlation_id_field: userId
+            add_timestamp: true
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: message_count
+        expected: 3
+
+      # All messages should have userId field in metadata (from metadata processor)
+      - type: all_match
+        condition: $exists(metadata.userId)
+
+      # All messages should have processedAt timestamp (from metadata processor)
+      - type: all_match
+        condition: $exists(metadata.processedAt)
+
+      # First message should be minor (age 20), others should be adults
+      - type: field_value
+        message: 0
+        path: content.category
+        expected: "minor"
+
+      - type: some_match
+        condition: content.category = "adult"
+
+      # Check specific message values
+      - type: field_value
+        message: 0
+        path: content.age
+        expected: 20
+
+      - type: field_value
+        message: 1
+        path: content.age
+        expected: 21
+
+      - type: field_value
+        message: 2
+        path: content.age
+        expected: 22
+
+  - name: "Should validate pipeline success"
+    pipeline:
+      input:
+        generate:
+          count: 1
+          template:
+            data: "test"
+
+      processors: []
+
+      output:
+        capture: {}
+
+    assertions:
+      - type: pipeline_success
+
+      - type: message_count
+        expected: 1

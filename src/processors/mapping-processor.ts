@@ -27,7 +27,8 @@ export const createMappingProcessor = (
   try {
     compiledExpression = jsonata(config.expression)
   } catch (error) {
-    throw new Error(`Failed to compile JSONata expression: ${error}`)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    throw new Error(`Failed to compile JSONata expression: ${errorMessage}`)
   }
 
   return {

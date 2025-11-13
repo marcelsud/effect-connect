@@ -1,0 +1,98 @@
+name: Error Handling Tests
+
+tests:
+  - name: "Should fail when assert processor condition is not met"
+    pipeline:
+      input:
+        generate:
+          count: 1
+          template:
+            value: 5
+
+      processors:
+        - assert:
+            condition: content.value > 10
+
+      output:
+        capture: {}
+
+    expectError:
+      messageContains: "Condition evaluated to false"
+
+  - name: "Should fail when required field is missing"
+    pipeline:
+      input:
+        generate:
+          count: 1
+          template:
+            firstName: "John"
+            # lastName is missing
+
+      processors:
+        - assert:
+            hasFields:
+              - firstName
+              - lastName
+
+      output:
+        capture: {}
+
+    expectError:
+      messageContains: "Missing field 'lastName'"
+
+  - name: "Should fail with invalid JSONata expression in mapping"
+    pipeline:
+      input:
+        generate:
+          count: 1
+          template:
+            value: "test"
+
+      processors:
+        - mapping:
+            expression: '{ invalid syntax ['
+
+      output:
+        capture: {}
+
+    expectError:
+      messageContains: "JSONata"
+
+  - name: "Should handle assert processor with complex condition"
+    pipeline:
+      input:
+        generate:
+          count: 1
+          template:
+            user:
+              age: 15
+              country: "US"
+
+      processors:
+        - assert:
+            condition: content.user.age >= 18 and content.user.country = "US"
+
+      output:
+        capture: {}
+
+    expectError:
+      messageContains: "Condition evaluated to false"
+
+  - name: "Should validate pipeline_failed assertion"
+    pipeline:
+      input:
+        generate:
+          count: 1
+          template:
+            test: "value"
+
+      processors:
+        - assert:
+            condition: content.test = "wrong value"
+
+      output:
+        capture: {}
+
+    # Pipeline should fail, and we can check that with assertions
+    assertions:
+      - type: pipeline_failed
