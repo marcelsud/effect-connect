@@ -1,0 +1,35 @@
+name: http-processor-error-handling
+
+input:
+  generate:
+    count: 2
+    interval: 100
+    template:
+      testId: "{{index}}"
+      errorType: "error-test-{{index}}"
+
+pipeline:
+  processors:
+    # Test HTTP 500 error (intermittent, should retry)
+    - http:
+        url: "http://localhost:8081/status/500"
+        method: "GET"
+        result_key: "error500Response"
+        timeout: 5000
+        maxRetries: 1
+
+    # Test HTTP 404 error (logical error, should NOT retry)
+    - http:
+        url: "http://localhost:8081/status/404"
+        method: "GET"
+        result_key: "error404Response"
+        timeout: 5000
+        maxRetries: 1
+
+    - log:
+        level: "info"
+        include_content: true
+
+output:
+  capture:
+    max_messages: 2

@@ -1,0 +1,47 @@
+name: http-processor-auth-and-headers
+
+input:
+  generate:
+    count: 3
+    interval: 100
+    template:
+      testId: "{{index}}"
+      testType: "auth-test-{{index}}"
+
+pipeline:
+  processors:
+    # Test 1: Bearer token authentication
+    - http:
+        url: "http://localhost:8081/bearer"
+        method: "GET"
+        bearer_token: "test-secret-token-12345"
+        result_key: "bearerAuth"
+        timeout: 5000
+
+    # Test 2: Custom headers
+    - http:
+        url: "http://localhost:8081/headers"
+        method: "GET"
+        headers:
+          X-Api-Key: "my-api-key-67890"
+          X-Request-ID: "test-{{content.testId}}"
+        result_key: "customHeaders"
+        timeout: 5000
+
+    # Test 3: Basic authentication
+    - http:
+        url: "http://localhost:8081/basic-auth/testuser/testpass"
+        method: "GET"
+        basic_auth:
+          username: "testuser"
+          password: "testpass"
+        result_key: "basicAuth"
+        timeout: 5000
+
+    - log:
+        level: "info"
+        include_content: true
+
+output:
+  capture:
+    max_messages: 3

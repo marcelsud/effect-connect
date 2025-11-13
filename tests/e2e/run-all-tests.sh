@@ -55,7 +55,12 @@ run_test "Redis Streams" "tests/e2e/scripts/test-redis-streams.sh"
 run_test "SQS (LocalStack)" "tests/e2e/scripts/test-sqs.sh"
 run_test "HTTP Input" "tests/e2e/scripts/test-http-input.sh"
 run_test "HTTP Output" "tests/e2e/scripts/test-http-output.sh"
-run_test "HTTP Processor" "tests/e2e/scripts/test-http-processor.sh"
+run_test "HTTP Processor (Basic)" "tests/e2e/scripts/test-http-processor.sh"
+run_test "HTTP Processor POST" "tests/e2e/scripts/test-http-processor-post.sh"
+run_test "HTTP Processor Auth" "tests/e2e/scripts/test-http-processor-auth.sh"
+run_test "HTTP Processor Errors" "tests/e2e/scripts/test-http-processor-errors.sh"
+run_test "HTTP Processor Retry" "tests/e2e/scripts/test-http-processor-retry.sh"
+run_test "HTTP Processor Templates" "tests/e2e/scripts/test-http-processor-templates.sh"
 
 # Print summary
 echo -e "${BLUE}╔════════════════════════════════════════════════════════╗${NC}"

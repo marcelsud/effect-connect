@@ -1,0 +1,27 @@
+name: http-processor-retry-and-timeout
+
+input:
+  generate:
+    count: 2
+    interval: 100
+    template:
+      testId: "{{index}}"
+      testType: "retry-test-{{index}}"
+
+pipeline:
+  processors:
+    # Test retry with 503 error (intermittent, should retry)
+    - http:
+        url: "http://localhost:8081/status/503"
+        method: "GET"
+        result_key: "retryResponse"
+        timeout: 5000
+        maxRetries: 2
+
+    - log:
+        level: "info"
+        include_content: true
+
+output:
+  capture:
+    max_messages: 2

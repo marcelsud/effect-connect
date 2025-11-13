@@ -1,0 +1,37 @@
+name: http-processor-post-with-result-mapping
+
+input:
+  generate:
+    count: 3
+    interval: 100
+    template:
+      orderId: "{{index}}"
+      product: "widget-{{index}}"
+      quantity: "{{index + 1}}"
+
+pipeline:
+  processors:
+    - http:
+        url: "http://localhost:8081/post"
+        method: "POST"
+        body: |
+          {
+            "order": "{{content.orderId}}",
+            "product": "{{content.product}}",
+            "qty": {{content.quantity}}
+          }
+        result_mapping: |
+          {
+            "orderId": content.orderId,
+            "product": content.product,
+            "quantity": content.quantity,
+            "apiResponse": $
+          }
+        timeout: 5000
+    - log:
+        level: "info"
+        include_content: true
+
+output:
+  capture:
+    max_messages: 3

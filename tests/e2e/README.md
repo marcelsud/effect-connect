@@ -39,6 +39,11 @@ e2e/
 ./e2e/scripts/test-http-input.sh
 ./e2e/scripts/test-http-output.sh
 ./e2e/scripts/test-http-processor.sh
+./e2e/scripts/test-http-processor-post.sh
+./e2e/scripts/test-http-processor-auth.sh
+./e2e/scripts/test-http-processor-errors.sh
+./e2e/scripts/test-http-processor-retry.sh
+./e2e/scripts/test-http-processor-templates.sh
 ```
 
 ## Test Coverage
@@ -51,9 +56,14 @@ e2e/
 | AWS SQS | I/O | ✅ | 5 | Cloud queue (LocalStack) |
 | HTTP Input | Input | ✅ | 3 | Webhook server |
 | HTTP Output | Output | ✅ | 3 | HTTP client |
-| HTTP Processor | Processor | ✅ | 2 | API enrichment |
+| HTTP Processor (Basic) | Processor | ✅ | 2 | API enrichment (GET) |
+| HTTP Processor POST | Processor | ✅ | 3 | POST with body & result mapping |
+| HTTP Processor Auth | Processor | ✅ | 3 | Bearer/Basic auth & custom headers |
+| HTTP Processor Errors | Processor | ✅ | 3 | Error handling (4xx/5xx) |
+| HTTP Processor Retry | Processor | ✅ | 2 | Timeout & retry behavior |
+| HTTP Processor Templates | Processor | ✅ | 3 | Complex JSONata templates |
 
-**Total**: 7/7 tests passing (100% coverage)
+**Total**: 12/12 tests passing (100% coverage)
 
 ## Prerequisites
 

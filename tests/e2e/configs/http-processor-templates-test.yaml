@@ -1,0 +1,47 @@
+name: http-processor-complex-templates
+
+input:
+  generate:
+    count: 3
+    interval: 100
+    template:
+      user:
+        id: "user-{{index}}"
+        name: "Test User {{index}}"
+      action: "action-{{index}}"
+      items:
+        - price: 10
+        - price: 20
+        - price: 30
+
+pipeline:
+  processors:
+    # Test URL with multiple template variables
+    - http:
+        url: "http://localhost:8081/get?userId={{content.user.id}}&action={{content.action}}&index={{content.user.name}}"
+        method: "GET"
+        result_key: "urlTemplateResponse"
+        timeout: 5000
+
+    # Test POST with JSONata body template
+    - http:
+        url: "http://localhost:8081/post"
+        method: "POST"
+        body: |
+          {
+            "userId": "{{content.user.id}}",
+            "userName": "{{content.user.name}}",
+            "action": "{{content.action}}",
+            "totalPrice": "{{content.items.price ~> $sum()}}",
+            "itemCount": "{{content.items ~> $count()}}"
+          }
+        result_key: "bodyTemplateResponse"
+        timeout: 5000
+
+    - log:
+        level: "info"
+        include_content: true
+
+output:
+  capture:
+    max_messages: 3
