@@ -11,12 +11,17 @@ import type {
 import type { Pipeline, Input, Processor, Output } from "./types.js";
 import { createSqsInput } from "../inputs/sqs-input.js";
 import { createRedisStreamsInput } from "../inputs/redis-streams-input.js";
+import { createRedisPubSubInput } from "../inputs/redis-pubsub-input.js";
+import { createRedisListInput } from "../inputs/redis-list-input.js";
 import { createHttpInput } from "../inputs/http-input.js";
 import { createMetadataProcessor } from "../processors/metadata-processor.js";
 import { createUppercaseProcessor } from "../processors/uppercase-processor.js";
 import { createLoggingProcessor } from "../processors/logging-processor.js";
 import { createMappingProcessor } from "../processors/mapping-processor.js";
+import { createHttpProcessor } from "../processors/http-processor.js";
 import { createRedisStreamsOutput } from "../outputs/redis-streams-output.js";
+import { createRedisPubSubOutput } from "../outputs/redis-pubsub-output.js";
+import { createRedisListOutput } from "../outputs/redis-list-output.js";
 import { createSqsOutput } from "../outputs/sqs-output.js";
 import { createHttpOutput } from "../outputs/http-output.js";
 // Testing utilities
@@ -101,6 +106,43 @@ const buildInputInternal = (
     );
   }
 
+  if (config.redis_pubsub) {
+    return Effect.succeed(
+      createRedisPubSubInput({
+        host: config.redis_pubsub.host || "localhost",
+        port: config.redis_pubsub.port || 6379,
+        channels: config.redis_pubsub.channels
+          ? [...config.redis_pubsub.channels]
+          : undefined,
+        patterns: config.redis_pubsub.patterns
+          ? [...config.redis_pubsub.patterns]
+          : undefined,
+        password: config.redis_pubsub.password,
+        db: config.redis_pubsub.db,
+        queueSize: config.redis_pubsub.queue_size,
+      }),
+    );
+  }
+
+  if (config.redis_list) {
+    const key =
+      typeof config.redis_list.key === "string"
+        ? config.redis_list.key
+        : [...config.redis_list.key];
+
+    return Effect.succeed(
+      createRedisListInput({
+        host: config.redis_list.host || "localhost",
+        port: config.redis_list.port || 6379,
+        key,
+        direction: config.redis_list.direction,
+        timeout: config.redis_list.timeout,
+        password: config.redis_list.password,
+        db: config.redis_list.db,
+      }),
+    );
+  }
+
   if (config.http) {
     return Effect.succeed(
       createHttpInput({
@@ -165,6 +207,22 @@ const buildProcessor = (
     );
   }
 
+  if (config.http) {
+    return Effect.succeed(
+      createHttpProcessor({
+        url: config.http.url,
+        method: config.http.method,
+        body: config.http.body,
+        headers: config.http.headers,
+        timeout: config.http.timeout,
+        maxRetries: config.http.max_retries,
+        auth: config.http.auth,
+        resultKey: config.http.result_key,
+        resultMapping: config.http.result_mapping,
+      }),
+    );
+  }
+
   // Testing utility: assert processor
   if ((config as any).assert) {
     return Effect.succeed(createAssertProcessor((config as any).assert));
@@ -221,6 +279,32 @@ const buildOutput = (
         endpoint: config.aws_sqs.endpoint,
         maxBatchSize: config.aws_sqs.max_batch_size,
         delaySeconds: config.aws_sqs.delay_seconds,
+      }),
+    );
+  }
+
+  if (config.redis_pubsub) {
+    return Effect.succeed(
+      createRedisPubSubOutput({
+        host: config.redis_pubsub.host || "localhost",
+        port: config.redis_pubsub.port || 6379,
+        channel: config.redis_pubsub.channel,
+        password: config.redis_pubsub.password,
+        db: config.redis_pubsub.db,
+      }),
+    );
+  }
+
+  if (config.redis_list) {
+    return Effect.succeed(
+      createRedisListOutput({
+        host: config.redis_list.host || "localhost",
+        port: config.redis_list.port || 6379,
+        key: config.redis_list.key,
+        direction: config.redis_list.direction,
+        maxLen: config.redis_list.max_length,
+        password: config.redis_list.password,
+        db: config.redis_list.db,
       }),
     );
   }

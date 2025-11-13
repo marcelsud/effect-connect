@@ -4,6 +4,7 @@ This document outlines the principles and patterns for developing inputs, output
 
 ## Table of Contents
 
+- [⚠️ CRITICAL: Component Registration Pattern](#️-critical-component-registration-pattern)
 - [Philosophy](#philosophy)
 - [Core Principles](#core-principles)
 - [Input Components](#input-components)
@@ -13,6 +14,133 @@ This document outlines the principles and patterns for developing inputs, output
 - [Configuration Schema](#configuration-schema)
 - [Testing Requirements](#testing-requirements)
 - [Code Templates](#code-templates)
+- [Common Mistakes & Troubleshooting](#common-mistakes--troubleshooting)
+
+---
+
+## ⚠️ CRITICAL: Component Registration Pattern
+
+### The 3-File Pattern (REQUIRED)
+
+**Every new component MUST be registered in THREE files or it will be unusable via YAML configuration.**
+
+This is the #1 cause of "component not found" errors. Unit tests will pass (they import components directly), but E2E tests and user YAML configs will fail.
+
+#### Required Files:
+
+```
+1. src/[inputs|processors|outputs]/my-component.ts  ← Component implementation
+2. src/core/config-loader.ts                        ← Effect Schema definition
+3. src/core/pipeline-builder.ts                     ← Builder logic
+```
+
+#### Step-by-Step Registration:
+
+**Step 1: Implement Component** (`src/inputs/my-component.ts`)
+```typescript
+export interface MyComponentConfig {
+  readonly url: string
+  readonly timeout?: number
+}
+
+export const createMyComponent = (config: MyComponentConfig): Input => {
+  // Implementation
+}
+```
+
+**Step 2: Add Schema** (`src/core/config-loader.ts`)
+```typescript
+// Add schema for your component
+const MyComponentInputSchema = S.Struct({
+  url: S.String,
+  timeout: S.optional(S.Number),
+})
+
+// CRITICAL: Add to union schema
+const InputConfigSchema = S.Struct({
+  aws_sqs: S.optional(AwsSqsInputSchema),
+  redis_streams: S.optional(RedisStreamsInputSchema),
+  my_component: S.optional(MyComponentInputSchema),  // ← ADD THIS LINE
+  // ... other inputs
+})
+```
+
+**Step 3: Add Builder** (`src/core/pipeline-builder.ts`)
+```typescript
+// CRITICAL: Add import
+import { createMyComponent } from "../inputs/my-component.js"
+
+const buildInput = (config: InputConfig): Effect.Effect<Input<any>, BuildError> => {
+  // ... existing inputs
+
+  // CRITICAL: Add builder case
+  if (config.my_component) {
+    return Effect.succeed(
+      createMyComponent({
+        url: config.my_component.url,
+        timeout: config.my_component.timeout,
+      })
+    )
+  }
+
+  return Effect.fail(new BuildError("No valid input configuration found"))
+}
+```
+
+### Verification Checklist
+
+After implementing a component, verify registration:
+
+- [ ] ✅ Component file exists in `src/inputs/` (or processors/outputs)
+- [ ] ✅ Schema added to `InputConfigSchema` in `config-loader.ts`
+- [ ] ✅ Import added to `pipeline-builder.ts`
+- [ ] ✅ Builder case added to `buildInput()` function
+- [ ] ✅ YAML config tested (not just unit tests!)
+- [ ] ✅ E2E test created and passing
+
+### YAML Configuration Format
+
+**Inputs and Outputs**: Use direct keys
+```yaml
+input:
+  my_component:  # ✅ Direct key (no "type:" field)
+    url: "http://example.com"
+    timeout: 5000
+```
+
+**Processors**: Use `pipeline:` wrapper
+```yaml
+pipeline:  # ✅ REQUIRED wrapper
+  processors:
+    - my_processor:
+        field: "value"
+```
+
+**Common YAML Mistakes:**
+```yaml
+# ❌ WRONG - processors without pipeline wrapper
+processors:
+  - metadata:
+      add_timestamp: true
+
+# ✅ CORRECT - with pipeline wrapper
+pipeline:
+  processors:
+    - metadata:
+        add_timestamp: true
+
+# ❌ WRONG - using "type" field for inputs
+input:
+  type: my_component
+  url: "http://example.com"
+
+# ✅ CORRECT - direct key
+input:
+  my_component:
+    url: "http://example.com"
+```
+
+---
 
 ## Philosophy
 
@@ -783,22 +911,261 @@ export const createComponentProcessor = (
 
 ## Summary Checklist
 
-When creating a new component, ensure you:
+### ⚠️ Critical Registration (DO NOT SKIP)
 
-- [ ] Follow the interface contract exactly
-- [ ] Use tagged error classes for type safety
-- [ ] Implement optional close() for cleanup
-- [ ] Add comprehensive error handling
-- [ ] Enrich metadata appropriately
-- [ ] Use appropriate Effect.js patterns
-- [ ] Add configuration schema to config-loader.ts
-- [ ] Add builder to pipeline-builder.ts
-- [ ] Export from src/index.ts
-- [ ] Write unit tests (config, happy path, errors, cleanup)
-- [ ] Write E2E tests (full pipeline integration)
-- [ ] Document YAML configuration in README.md
-- [ ] Provide code examples
-- [ ] Test with LocalStack/local services
+**Before considering a component complete, verify ALL of these:**
+
+- [ ] **Component Implementation** (`src/[inputs|processors|outputs]/`)
+  - [ ] Interface contract followed exactly
+  - [ ] Tagged error classes for type safety
+  - [ ] Optional `close()` method for cleanup
+  - [ ] Comprehensive error handling
+  - [ ] Metadata enrichment
+  - [ ] Appropriate Effect.js patterns
+
+- [ ] **Schema Registration** (`src/core/config-loader.ts`)
+  - [ ] Created schema using `S.Struct()`
+  - [ ] Added to `InputConfigSchema` / `ProcessorConfigSchema` / `OutputConfigSchema`
+  - [ ] Property name matches YAML key (e.g., `my_component`)
+  - [ ] All config fields defined with correct types
+  - [ ] Optional fields marked with `S.optional()`
+
+- [ ] **Builder Registration** (`src/core/pipeline-builder.ts`)
+  - [ ] Import statement added at top of file
+  - [ ] Builder case added to `buildInput()` / `buildProcessor()` / `buildOutput()`
+  - [ ] Config properties mapped correctly
+  - [ ] Handle readonly array conversions if needed (use spread: `[...array]`)
+  - [ ] Component name added to pipeline name generation
+
+- [ ] **Testing & Validation**
+  - [ ] Unit tests (config, happy path, errors, cleanup)
+  - [ ] **E2E test with YAML config** (CRITICAL - catches registration issues)
+  - [ ] Test both success and failure scenarios
+  - [ ] Verify with real services (Docker/LocalStack)
+  - [ ] Pipeline executes successfully
+  - [ ] Messages processed correctly
+
+- [ ] **Documentation**
+  - [ ] Export from `src/index.ts`
+  - [ ] YAML configuration examples in README.md
+  - [ ] Code examples provided
+  - [ ] Common use cases documented
+
+### Testing Priority
+
+**Test in this order to catch issues early:**
+
+1. ✅ Unit tests (verifies implementation)
+2. ✅ **YAML E2E test** (verifies registration - MOST IMPORTANT)
+3. ✅ Integration tests (verifies external service compatibility)
+
+**Why E2E is critical:** Unit tests import components directly and will pass even if the component is not registered. Only E2E tests using YAML configs will catch registration issues.
+
+---
+
+## Common Mistakes & Troubleshooting
+
+### Issue: "No valid input configuration found"
+
+**Symptom:**
+```
+ERROR: BuildError: No valid input configuration found
+```
+
+**Causes:**
+1. ❌ Component not registered in `pipeline-builder.ts`
+2. ❌ Schema not added to `config-loader.ts`
+3. ❌ YAML key doesn't match schema property name
+4. ❌ Wrong YAML format (using `type:` instead of direct key)
+
+**Solution:**
+```bash
+# 1. Check if component is imported in pipeline-builder.ts
+grep "createMyComponent" src/core/pipeline-builder.ts
+
+# 2. Check if builder case exists
+grep "config.my_component" src/core/pipeline-builder.ts
+
+# 3. Check if schema is registered
+grep "my_component:" src/core/config-loader.ts
+
+# 4. Verify YAML format
+cat config.yaml  # Should use direct key, not "type:"
+```
+
+### Issue: "Pipeline built successfully with 0 processors"
+
+**Symptom:**
+```
+INFO: Pipeline built successfully with 0 processors
+```
+But you have processors in your YAML config.
+
+**Cause:** Missing `pipeline:` wrapper around `processors:`
+
+**Wrong:**
+```yaml
+processors:  # ❌ Silently ignored
+  - metadata:
+      add_timestamp: true
+```
+
+**Correct:**
+```yaml
+pipeline:  # ✅ Required
+  processors:
+    - metadata:
+        add_timestamp: true
+```
+
+### Issue: TypeScript compilation error - readonly arrays
+
+**Symptom:**
+```
+Type 'readonly string[]' is not assignable to type 'string[]'
+```
+
+**Cause:** Effect Schema returns readonly arrays, components expect mutable arrays
+
+**Solution:** Use spread operator to convert:
+```typescript
+// In pipeline-builder.ts
+if (config.my_component) {
+  return Effect.succeed(
+    createMyComponent({
+      items: config.my_component.items
+        ? [...config.my_component.items]  // ✅ Convert readonly to mutable
+        : undefined,
+    })
+  )
+}
+```
+
+### Issue: Component works in unit tests but not in YAML
+
+**Symptom:** All unit tests pass, but `effect-connect run config.yaml` fails
+
+**Cause:** Unit tests import components directly, bypassing YAML configuration path
+
+**Diagnosis:**
+```bash
+# Run YAML config test
+effect-connect run test-config.yaml
+
+# If it fails, check registration:
+# 1. Schema in config-loader.ts?
+# 2. Builder in pipeline-builder.ts?
+# 3. Import statement added?
+```
+
+**Solution:** Always create an E2E test that uses YAML configuration
+
+### Issue: Schema validation fails
+
+**Symptom:**
+```
+ERROR: ConfigValidationError: Schema validation failed
+```
+
+**Common causes:**
+1. Required field missing in YAML
+2. Wrong data type (string vs number)
+3. Invalid enum value
+4. Missing `S.optional()` for optional fields
+
+**Debug:**
+```typescript
+// Check schema definition
+const MyComponentSchema = S.Struct({
+  url: S.String,                    // Required
+  port: S.Number,                   // Required
+  timeout: S.optional(S.Number),    // Optional ✅
+  retries: S.Int.pipe(S.positive()) // Must be positive integer
+})
+```
+
+### Debugging Checklist
+
+When a component doesn't work:
+
+1. **Check all 3 files exist:**
+   ```bash
+   ls src/inputs/my-component.ts
+   grep "my_component" src/core/config-loader.ts
+   grep "my_component" src/core/pipeline-builder.ts
+   ```
+
+2. **Verify schema property name matches YAML:**
+   ```typescript
+   // In config-loader.ts
+   const InputConfigSchema = S.Struct({
+     my_component: S.optional(MyComponentSchema),  // Must match YAML key
+   })
+   ```
+
+3. **Check builder logic:**
+   ```typescript
+   // In pipeline-builder.ts
+   if (config.my_component) {  // Must match schema key
+     return Effect.succeed(createMyComponent(...))
+   }
+   ```
+
+4. **Test with YAML:**
+   ```bash
+   # Create minimal test config
+   cat > test.yaml << EOF
+   input:
+     my_component:
+       url: "http://test"
+   output:
+     capture: {}
+   EOF
+
+   # Run it
+   effect-connect run test.yaml --debug
+   ```
+
+5. **Check debug logs:**
+   ```bash
+   effect-connect run config.yaml --debug 2>&1 | grep -i "my_component"
+   ```
+
+### Prevention
+
+**Always use this workflow when adding a component:**
+
+```bash
+# 1. Implement component
+vim src/inputs/my-component.ts
+
+# 2. Add schema
+vim src/core/config-loader.ts
+# - Add schema definition
+# - Add to InputConfigSchema
+
+# 3. Add builder
+vim src/core/pipeline-builder.ts
+# - Add import
+# - Add builder case
+
+# 4. Build
+npm run build
+
+# 5. Create E2E test IMMEDIATELY
+vim tmp-e2e-tests/configs/my-component-test.yaml
+vim tmp-e2e-tests/scripts/test-my-component.sh
+
+# 6. Run E2E test
+./tmp-e2e-tests/scripts/test-my-component.sh
+
+# 7. Only if E2E passes, write unit tests
+vim src/inputs/my-component.test.ts
+```
+
+This workflow catches registration issues immediately, before writing unit tests.
+
+---
 
 ## Additional Resources
 
@@ -809,6 +1176,10 @@ When creating a new component, ensure you:
 
 ---
 
-**Version**: 1.0
-**Last Updated**: 2025-01-11
+**Version**: 1.1
+**Last Updated**: 2025-01-13
 **Maintainer**: Camel Connect JS Team
+
+**Changelog**:
+- v1.1 (2025-01-13): Added critical 3-file registration pattern, YAML format guide, and comprehensive troubleshooting section based on E2E testing findings
+- v1.0 (2025-01-11): Initial version

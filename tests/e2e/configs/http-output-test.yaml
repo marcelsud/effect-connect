@@ -1,0 +1,24 @@
+name: http-output-test
+
+input:
+  generate:
+    count: 3
+    interval: 100
+    template:
+      messageId: "http-out-{{index}}"
+      content: "HTTP output test {{index}}"
+      timestamp: "{{timestamp}}"
+
+pipeline:
+  processors:
+    - metadata:
+        add_timestamp: true
+
+output:
+  http:
+    url: "http://localhost:8081/post"
+    method: "POST"
+    headers:
+      Content-Type: "application/json"
+      X-Test-Header: "e2e-test"
+    timeout: 10000

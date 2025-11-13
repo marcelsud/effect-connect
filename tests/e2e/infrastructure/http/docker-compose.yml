@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # HTTP server that can receive webhooks and respond to requests
+  httpbin:
+    image: kennethreitz/httpbin
+    container_name: e2e-httpbin
+    ports:
+      - "8081:80"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/status/200"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - e2e-network
+
+  # Simple HTTP echo server for testing
+  echo-server:
+    image: ealen/echo-server:latest
+    container_name: e2e-echo
+    ports:
+      - "8082:80"
+    environment:
+      - PORT=80
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost/"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - e2e-network
+
+networks:
+  e2e-network:
+    driver: bridge

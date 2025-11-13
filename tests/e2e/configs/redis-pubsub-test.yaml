@@ -1,0 +1,21 @@
+name: redis-pubsub-e2e-test
+
+input:
+  generate:
+    count: 10
+    interval: 50
+    template:
+      messageId: "msg-{{index}}"
+      content: "Test message {{index}}"
+      timestamp: "{{timestamp}}"
+
+pipeline:
+  processors:
+    - metadata:
+        add_timestamp: true
+
+output:
+  redis_pubsub:
+    host: localhost
+    port: 6380
+    channel: "e2e-test-channel"

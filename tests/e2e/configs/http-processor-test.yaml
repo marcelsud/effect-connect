@@ -1,0 +1,24 @@
+name: http-processor-enrichment
+
+input:
+  generate:
+    count: 2
+    interval: 100
+    template:
+      userId: "{{index}}"
+      action: "test-action-{{index}}"
+
+pipeline:
+  processors:
+    - http:
+        url: "http://localhost:8081/uuid"
+        method: "GET"
+        result_key: "enrichment"
+        timeout: 5000
+    - log:
+        level: "info"
+        include_content: true
+
+output:
+  capture:
+    max_messages: 2

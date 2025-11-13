@@ -1,0 +1,19 @@
+name: redis-list-consumer
+
+input:
+  redis_list:
+    host: localhost
+    port: 6380
+    key: "e2e-test-list"
+    direction: "left"
+    timeout: 5
+
+pipeline:
+  processors:
+    - log:
+        level: "info"
+        include_content: true
+
+output:
+  capture:
+    max_messages: 5

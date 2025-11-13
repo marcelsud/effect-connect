@@ -1,0 +1,21 @@
+name: redis-streams-producer
+
+input:
+  generate:
+    count: 5
+    interval: 50
+    template:
+      messageId: "stream-msg-{{index}}"
+      content: "Redis Streams message {{index}}"
+      timestamp: "{{timestamp}}"
+
+pipeline:
+  processors:
+    - metadata:
+        add_timestamp: true
+
+output:
+  redis_streams:
+    url: "redis://localhost:6380"
+    stream: "e2e-test-stream"
+    max_length: 1000

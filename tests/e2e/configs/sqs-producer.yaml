@@ -1,0 +1,21 @@
+name: sqs-producer
+
+input:
+  generate:
+    count: 5
+    interval: 50
+    template:
+      messageId: "sqs-msg-{{index}}"
+      content: "SQS message {{index}}"
+      timestamp: "{{timestamp}}"
+
+pipeline:
+  processors:
+    - metadata:
+        add_timestamp: true
+
+output:
+  aws_sqs:
+    url: "http://localhost:4566/000000000000/e2e-test-queue"
+    region: "us-east-1"
+    endpoint: "http://localhost:4566"

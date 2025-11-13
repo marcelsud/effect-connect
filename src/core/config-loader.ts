@@ -66,12 +66,63 @@ const HttpInputSchema = S.Struct({
 });
 
 /**
+ * Schema for Redis Pub/Sub Input configuration (Bento style)
+ */
+const RedisPubSubInputSchema = S.Struct({
+  host: S.String,
+  port: S.Number,
+  password: S.optional(S.String),
+  db: S.optional(S.Number),
+  channels: S.optional(S.Array(S.String)),
+  patterns: S.optional(S.Array(S.String)),
+  queue_size: S.optional(S.Number),
+  connect_timeout: S.optional(S.Number),
+  command_timeout: S.optional(S.Number),
+  keep_alive: S.optional(S.Number),
+  lazy_connect: S.optional(S.Boolean),
+  max_retries_per_request: S.optional(S.Number),
+  enable_offline_queue: S.optional(S.Boolean),
+});
+
+/**
+ * Schema for Redis List Input configuration (Bento style)
+ */
+const RedisListInputSchema = S.Struct({
+  host: S.String,
+  port: S.Number,
+  key: S.Union(S.String, S.Array(S.String)),
+  password: S.optional(S.String),
+  db: S.optional(S.Number),
+  direction: S.optional(S.Union(S.Literal("left"), S.Literal("right"))),
+  timeout: S.optional(S.Number),
+  connect_timeout: S.optional(S.Number),
+  command_timeout: S.optional(S.Number),
+  keep_alive: S.optional(S.Number),
+  lazy_connect: S.optional(S.Boolean),
+  max_retries_per_request: S.optional(S.Number),
+  enable_offline_queue: S.optional(S.Boolean),
+});
+
+/**
+ * Schema for Generate Input (testing utility)
+ */
+const GenerateInputSchema = S.Struct({
+  count: S.Int.pipe(S.positive()),
+  interval: S.optional(S.Int.pipe(S.nonNegative())),
+  template: S.Record({ key: S.String, value: S.Unknown }),
+  start_index: S.optional(S.Int.pipe(S.nonNegative())),
+});
+
+/**
  * Input configuration - detects type by key
  */
 const InputConfigSchema = S.Struct({
   aws_sqs: S.optional(AwsSqsInputSchema),
   redis_streams: S.optional(RedisStreamsInputSchema),
+  redis_pubsub: S.optional(RedisPubSubInputSchema),
+  redis_list: S.optional(RedisListInputSchema),
   http: S.optional(HttpInputSchema),
+  generate: S.optional(GenerateInputSchema),
   // Future inputs can be added here:
   // kafka: S.optional(KafkaInputSchema),
 });
@@ -114,6 +165,35 @@ const MappingProcessorSchema = S.Struct({
 });
 
 /**
+ * Schema for HTTP Processor (API enrichment and validation)
+ */
+const HttpProcessorSchema = S.Struct({
+  url: S.String,
+  method: S.optional(
+    S.Union(
+      S.Literal("GET"),
+      S.Literal("POST"),
+      S.Literal("PUT"),
+      S.Literal("PATCH"),
+    ),
+  ),
+  headers: S.optional(S.Record({ key: S.String, value: S.String })),
+  body: S.optional(S.String),
+  result_key: S.optional(S.String),
+  result_mapping: S.optional(S.String),
+  timeout: S.optional(S.Number),
+  max_retries: S.optional(S.Number),
+  auth: S.optional(
+    S.Struct({
+      type: S.Union(S.Literal("basic"), S.Literal("bearer")),
+      username: S.optional(S.String),
+      password: S.optional(S.String),
+      token: S.optional(S.String),
+    }),
+  ),
+});
+
+/**
  * Processor configuration - each processor is an object with its type as key
  */
 const ProcessorConfigSchema = S.Struct({
@@ -121,6 +201,7 @@ const ProcessorConfigSchema = S.Struct({
   uppercase: S.optional(UppercaseProcessorSchema),
   log: S.optional(LogProcessorSchema),
   mapping: S.optional(MappingProcessorSchema),
+  http: S.optional(HttpProcessorSchema),
   // Future processors can be added here:
   // filter: S.optional(FilterProcessorSchema),
 });
@@ -167,12 +248,60 @@ const HttpOutputSchema = S.Struct({
 });
 
 /**
+ * Schema for Redis Pub/Sub Output configuration (Bento style)
+ */
+const RedisPubSubOutputSchema = S.Struct({
+  host: S.String,
+  port: S.Number,
+  channel: S.String,
+  password: S.optional(S.String),
+  db: S.optional(S.Number),
+  max_retries: S.optional(S.Number),
+  connect_timeout: S.optional(S.Number),
+  command_timeout: S.optional(S.Number),
+  keep_alive: S.optional(S.Number),
+  lazy_connect: S.optional(S.Boolean),
+  max_retries_per_request: S.optional(S.Number),
+  enable_offline_queue: S.optional(S.Boolean),
+});
+
+/**
+ * Schema for Redis List Output configuration (Bento style)
+ */
+const RedisListOutputSchema = S.Struct({
+  host: S.String,
+  port: S.Number,
+  key: S.String,
+  password: S.optional(S.String),
+  db: S.optional(S.Number),
+  direction: S.optional(S.Union(S.Literal("left"), S.Literal("right"))),
+  max_length: S.optional(S.Number),
+  max_retries: S.optional(S.Number),
+  connect_timeout: S.optional(S.Number),
+  command_timeout: S.optional(S.Number),
+  keep_alive: S.optional(S.Number),
+  lazy_connect: S.optional(S.Boolean),
+  max_retries_per_request: S.optional(S.Number),
+  enable_offline_queue: S.optional(S.Boolean),
+});
+
+/**
+ * Schema for Capture Output (testing utility)
+ */
+const CaptureOutputSchema = S.Struct({
+  max_messages: S.optional(S.Number),
+});
+
+/**
  * Output configuration - detects type by key
  */
 const OutputConfigSchema = S.Struct({
   redis_streams: S.optional(RedisStreamsOutputSchema),
+  redis_pubsub: S.optional(RedisPubSubOutputSchema),
+  redis_list: S.optional(RedisListOutputSchema),
   aws_sqs: S.optional(AwsSqsOutputSchema),
   http: S.optional(HttpOutputSchema),
+  capture: S.optional(CaptureOutputSchema),
   // Future outputs can be added here:
   // postgres: S.optional(PostgresOutputSchema),
 });

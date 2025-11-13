@@ -1,0 +1,19 @@
+name: sqs-consumer
+
+input:
+  aws_sqs:
+    url: "http://localhost:4566/000000000000/e2e-test-queue"
+    region: "us-east-1"
+    endpoint: "http://localhost:4566"
+    wait_time_seconds: 5
+    max_number_of_messages: 10
+
+pipeline:
+  processors:
+    - log:
+        level: "info"
+        include_content: true
+
+output:
+  capture:
+    max_messages: 5

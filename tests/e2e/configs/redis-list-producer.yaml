@@ -1,0 +1,22 @@
+name: redis-list-producer
+
+input:
+  generate:
+    count: 5
+    interval: 50
+    template:
+      messageId: "list-msg-{{index}}"
+      content: "Redis List message {{index}}"
+      timestamp: "{{timestamp}}"
+
+pipeline:
+  processors:
+    - metadata:
+        add_timestamp: true
+
+output:
+  redis_list:
+    host: localhost
+    port: 6380
+    key: "e2e-test-list"
+    direction: "right"

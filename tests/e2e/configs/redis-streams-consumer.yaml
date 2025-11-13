@@ -1,0 +1,19 @@
+name: redis-streams-consumer
+
+input:
+  redis_streams:
+    url: "redis://localhost:6380"
+    stream: "e2e-test-stream"
+    mode: "simple"
+    start_id: "0"
+    count: 10
+
+pipeline:
+  processors:
+    - log:
+        level: "info"
+        include_content: true
+
+output:
+  capture:
+    max_messages: 5

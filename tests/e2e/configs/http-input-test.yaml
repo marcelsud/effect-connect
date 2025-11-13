@@ -1,0 +1,20 @@
+name: http-input-webhook
+
+input:
+  http:
+    port: 8090
+    host: "0.0.0.0"
+    path: "/webhook"
+    timeout: 30000
+
+pipeline:
+  processors:
+    - log:
+        level: "info"
+        include_content: true
+    - metadata:
+        add_timestamp: true
+
+output:
+  capture:
+    max_messages: 3
