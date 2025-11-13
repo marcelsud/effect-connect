@@ -1,0 +1,30 @@
+name: branch-processor-test
+
+input:
+  generate:
+    count: 3
+    interval: 100
+    template:
+      orderId: "{{index}}-123"
+      amount: 100
+      product: "widget"
+
+pipeline:
+  processors:
+    # Branch processor: enriches data without modifying original message
+    - branch:
+        processors:
+          - metadata:
+              add_timestamp: true
+          - log:
+              level: "info"
+              include_content: true
+
+    # Log the final message with branch result
+    - log:
+        level: "info"
+        include_content: true
+
+output:
+  capture:
+    max_messages: 3

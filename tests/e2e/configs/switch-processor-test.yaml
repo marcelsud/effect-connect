@@ -1,0 +1,49 @@
+name: switch-processor-test
+
+input:
+  generate:
+    count: 6
+    interval: 100
+    template:
+      id: "msg-{{index}}"
+      type: "order"
+      amount: 100
+
+pipeline:
+  processors:
+    # Add variety to types based on index
+    - mapping:
+        expression: "{\"id\": id, \"type\": $number(id ~> $substringAfter(\"-\")) < 2 ? \"order\" : ($number(id ~> $substringAfter(\"-\")) < 4 ? \"refund\" : \"payment\"), \"amount\": amount}"
+
+    # Switch processor: route based on message type
+    - switch:
+        cases:
+          - check: type = "order"
+            processors:
+              - metadata:
+                  add_timestamp: true
+              - mapping:
+                  expression: "$merge([$, {\"orderRoute\": true}])"
+
+          - check: type = "refund"
+            processors:
+              - metadata:
+                  add_timestamp: true
+              - mapping:
+                  expression: "$merge([$, {\"refundRoute\": true}])"
+
+          - check: type = "payment"
+            processors:
+              - metadata:
+                  add_timestamp: false
+              - mapping:
+                  expression: "$merge([$, {\"defaultRoute\": true}])"
+
+    # Log final routed message
+    - log:
+        level: "info"
+        include_content: true
+
+output:
+  capture:
+    max_messages: 6

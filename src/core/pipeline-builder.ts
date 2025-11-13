@@ -19,6 +19,8 @@ import { createUppercaseProcessor } from "../processors/uppercase-processor.js";
 import { createLoggingProcessor } from "../processors/logging-processor.js";
 import { createMappingProcessor } from "../processors/mapping-processor.js";
 import { createHttpProcessor } from "../processors/http-processor.js";
+import { createBranchProcessor } from "../processors/branch-processor.js";
+import { createSwitchProcessor } from "../processors/switch-processor.js";
 import { createRedisStreamsOutput } from "../outputs/redis-streams-output.js";
 import { createRedisPubSubOutput } from "../outputs/redis-pubsub-output.js";
 import { createRedisListOutput } from "../outputs/redis-list-output.js";
@@ -221,6 +223,43 @@ const buildProcessor = (
         resultMapping: config.http.result_mapping,
       }),
     );
+  }
+
+  if (config.branch) {
+    const branchConfig = config.branch;
+    return Effect.gen(function* () {
+      // Recursively build nested processors
+      const nestedProcessors: Processor<any, any>[] = yield* Effect.forEach(
+        [...branchConfig.processors],
+        buildProcessor,
+        { concurrency: 1 },
+      );
+      return createBranchProcessor({ processors: nestedProcessors });
+    }) as Effect.Effect<Processor<any>, BuildError>;
+  }
+
+  if (config.switch) {
+    const switchConfig = config.switch;
+    return Effect.gen(function* () {
+      // Recursively build processors for each case
+      const cases = yield* Effect.forEach(
+        [...switchConfig.cases],
+        (switchCase) =>
+          Effect.gen(function* () {
+            const processors: Processor<any, any>[] = yield* Effect.forEach(
+              [...switchCase.processors],
+              buildProcessor,
+              { concurrency: 1 },
+            );
+            return {
+              check: switchCase.check,
+              processors,
+            };
+          }),
+        { concurrency: 1 },
+      );
+      return createSwitchProcessor({ cases });
+    }) as Effect.Effect<Processor<any>, BuildError>;
   }
 
   // Testing utility: assert processor

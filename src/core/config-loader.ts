@@ -194,17 +194,45 @@ const HttpProcessorSchema = S.Struct({
 });
 
 /**
- * Processor configuration - each processor is an object with its type as key
+ * Schema for Assert Processor (testing utility)
  */
-const ProcessorConfigSchema = S.Struct({
-  metadata: S.optional(MetadataProcessorSchema),
-  uppercase: S.optional(UppercaseProcessorSchema),
-  log: S.optional(LogProcessorSchema),
-  mapping: S.optional(MappingProcessorSchema),
-  http: S.optional(HttpProcessorSchema),
-  // Future processors can be added here:
-  // filter: S.optional(FilterProcessorSchema),
+const AssertProcessorSchema = S.Struct({
+  expression: S.String,
+  expected: S.Unknown,
 });
+
+/**
+ * Processor configuration - recursive to support nested processors (branch, switch)
+ * Uses S.suspend for recursive schema definition
+ */
+interface ProcessorConfigSchema extends S.Schema<ProcessorConfig> {}
+const ProcessorConfigSchema: ProcessorConfigSchema = S.suspend(
+  (): S.Schema<ProcessorConfig> =>
+    S.Struct({
+      metadata: S.optional(MetadataProcessorSchema),
+      uppercase: S.optional(UppercaseProcessorSchema),
+      log: S.optional(LogProcessorSchema),
+      mapping: S.optional(MappingProcessorSchema),
+      http: S.optional(HttpProcessorSchema),
+      branch: S.optional(
+        S.Struct({
+          processors: S.Array(S.suspend(() => ProcessorConfigSchema)),
+        }),
+      ),
+      switch: S.optional(
+        S.Struct({
+          cases: S.Array(
+            S.Struct({
+              check: S.String,
+              processors: S.Array(S.suspend(() => ProcessorConfigSchema)),
+            }),
+          ),
+        }),
+      ),
+      // Testing utilities
+      assert: S.optional(AssertProcessorSchema),
+    }),
+);
 
 /**
  * Schema for Redis Streams Output (Bento style)
@@ -324,8 +352,57 @@ export const PipelineConfigSchema = S.Struct({
  */
 export type PipelineConfig = S.Schema.Type<typeof PipelineConfigSchema>;
 export type InputConfig = S.Schema.Type<typeof InputConfigSchema>;
-export type ProcessorConfig = S.Schema.Type<typeof ProcessorConfigSchema>;
 export type OutputConfig = S.Schema.Type<typeof OutputConfigSchema>;
+
+/**
+ * ProcessorConfig type - manually defined as recursive
+ */
+export type ProcessorConfig = {
+  readonly metadata?: {
+    readonly correlation_id_field?: string;
+    readonly add_timestamp?: boolean;
+  };
+  readonly uppercase?: {
+    readonly fields: readonly string[];
+  };
+  readonly log?: {
+    readonly level?: "debug" | "info" | "warn" | "error";
+    readonly include_content?: boolean;
+  };
+  readonly mapping?: {
+    readonly expression: string;
+  };
+  readonly http?: {
+    readonly url: string;
+    readonly method?: "GET" | "POST" | "PUT" | "PATCH";
+    readonly headers?: Record<string, string>;
+    readonly body?: string;
+    readonly result_key?: string;
+    readonly result_mapping?: string;
+    readonly timeout?: number;
+    readonly max_retries?: number;
+    readonly auth?: {
+      readonly type: "basic" | "bearer";
+      readonly username?: string;
+      readonly password?: string;
+      readonly token?: string;
+    };
+  };
+  readonly branch?: {
+    readonly processors: readonly ProcessorConfig[];
+  };
+  readonly switch?: {
+    readonly cases: readonly {
+      readonly check: string;
+      readonly processors: readonly ProcessorConfig[];
+    }[];
+  };
+  // Testing utilities
+  readonly assert?: {
+    readonly expression: string;
+    readonly expected: unknown;
+  };
+};
 
 /**
  * Interpolate environment variables in strings
